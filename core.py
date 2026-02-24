@@ -322,6 +322,116 @@ def stack_lead(payload):
         raise e
 
 
+def bulk_insert_leads(payloads):
+    """
+    Insert many leads at once in a single query.
+    Much faster than calling stack_lead() per row.
+    """
+    if not payloads:
+        return 0
+
+    cols = _properties_columns()
+
+    rows = []
+    for payload in payloads:
+        owner_name = None
+        if payload.get("owner_first") and payload.get("owner_last"):
+            owner_name = f"{payload['owner_first']} {payload['owner_last']}".strip()
+        elif payload.get("owner_first"):
+            owner_name = payload["owner_first"]
+        elif payload.get("owner_last"):
+            owner_name = payload["owner_last"]
+        elif payload.get("owner_name"):
+            owner_name = payload["owner_name"]
+
+        row = {
+            "street_address": payload.get("address", ""),
+            "city": payload.get("city", ""),
+            "state": payload.get("state", ""),
+            "motivation_score": 1,
+            "last_list_source": payload.get("source", "Import"),
+        }
+        if payload.get("zip"):
+            row["zip_code"] = payload["zip"]
+        if owner_name:
+            row["owner_name"] = owner_name
+        if payload.get("apn"):
+            row["apn"] = payload["apn"]
+        if payload.get("phone_numbers"):
+            row["phone_numbers"] = payload["phone_numbers"]
+        if payload.get("property_type"):
+            row["property_type"] = payload["property_type"]
+        if payload.get("beds") is not None:
+            row["beds"] = payload["beds"]
+        if payload.get("baths") is not None:
+            row["baths"] = payload["baths"]
+        if payload.get("occupancy_status"):
+            row["occupancy_status"] = payload["occupancy_status"]
+        if payload.get("est_value") is not None:
+            row["est_value"] = payload["est_value"]
+        if payload.get("last_sale_price") is not None:
+            row["last_sale_price"] = payload["last_sale_price"]
+        if payload.get("county") and "county" in cols:
+            row["county"] = payload["county"]
+        if payload.get("mailing_address") and "mailing_address" in cols:
+            row["mailing_address"] = payload["mailing_address"]
+        if payload.get("mailing_city") and "mailing_city" in cols:
+            row["mailing_city"] = payload["mailing_city"]
+        if payload.get("mailing_state") and "mailing_state" in cols:
+            row["mailing_state"] = payload["mailing_state"]
+        if payload.get("mailing_zip") and "mailing_zip" in cols:
+            row["mailing_zip"] = payload["mailing_zip"]
+
+        optional_fields = [
+            "property_use",
+            "land_use",
+            "subdivision",
+            "legal_description",
+            "living_sqft",
+            "lot_acres",
+            "lot_sqft",
+            "year_built",
+            "stories",
+            "units_count",
+            "fireplaces",
+            "garage_type",
+            "garage_sqft",
+            "carport",
+            "carport_area",
+            "ac_type",
+            "heating_type",
+            "ownership_length_months",
+            "owner_type",
+            "owner_occupied",
+            "vacant",
+        ]
+        for f in optional_fields:
+            if payload.get(f) is not None and f in cols:
+                row[f] = payload[f]
+
+        rows.append(row)
+
+    all_cols = []
+    for row in rows:
+        for k in row:
+            if k not in all_cols:
+                all_cols.append(k)
+
+    placeholders = []
+    all_params = []
+    for row in rows:
+        row_vals = [row.get(c) for c in all_cols]
+        placeholders.append("(" + ", ".join(["%s"] * len(all_cols)) + ")")
+        all_params.extend(row_vals)
+
+    query = f"""
+        INSERT INTO properties ({', '.join(all_cols)})
+        VALUES {', '.join(placeholders)}
+    """
+    execute_query(query, all_params)
+    return len(rows)
+
+
 def get_pipeline_counts():
     """Return list of dicts: stage (or 'Unset'), count. Requires 'stage' column."""
     q = """
