@@ -6,6 +6,7 @@ from core import (
     execute_query,
     get_db_connection,
     stack_lead,
+    bulk_insert_leads,
     get_table_schema,
     get_pipeline_counts,
     get_leads_by_stage,
@@ -1359,13 +1360,15 @@ with tab2:
                         if st.button(f"Import this file", key=f"import_{idx}", type="primary"):
                             prog = st.progress(0)
                             status = st.empty()
-                            err_container = st.container()
                             stats = {"new": 0, "error": 0, "skipped": 0}
+
+                            BATCH_SIZE = 500
+                            batch = []
 
                             for i, row in raw_df.iterrows():
                                 try:
                                     addr_val = row.get(m_prop_addr) if m_prop_addr != "None" else None
-                                    if pd.isna(addr_val) or str(addr_val).strip() == '':
+                                    if pd.isna(addr_val) or str(addr_val).strip() == "":
                                         stats["skipped"] += 1
                                         continue
 
@@ -1383,13 +1386,11 @@ with tab2:
                                     if source_name:
                                         payload["source"] = source_name
 
-                                    # Property Zip, County
                                     if m_prop_zip != "None" and not pd.isna(row.get(m_prop_zip)):
                                         payload["zip"] = str(row[m_prop_zip]).strip()[:20]
                                     if m_prop_county != "None" and not pd.isna(row.get(m_prop_county)):
                                         payload["county"] = str(row[m_prop_county]).strip()[:100]
 
-                                    # Owner 1 First Name, Last Name
                                     owner_first = ""
                                     owner_last = ""
                                     if m_first_name != "None" and not pd.isna(row.get(m_first_name)):
@@ -1398,40 +1399,48 @@ with tab2:
                                     if m_last_name != "None" and not pd.isna(row.get(m_last_name)):
                                         owner_last = str(row[m_last_name]).strip()
                                         payload["owner_last"] = owner_last
-                                    
-                                    # Additional Owners (2-4) - combine into owner_name if multiple owners
+
                                     owner_names_parts = []
                                     owner1_name = f"{owner_first} {owner_last}".strip()
                                     if owner1_name:
                                         owner_names_parts.append(owner1_name)
-                                    
+
                                     if m_owner2_first != "None" and not pd.isna(row.get(m_owner2_first)):
                                         owner2_first = str(row[m_owner2_first]).strip()
-                                        owner2_last = str(row.get(m_owner2_last, "")).strip() if m_owner2_last != "None" and not pd.isna(row.get(m_owner2_last)) else ""
+                                        owner2_last = (
+                                            str(row.get(m_owner2_last, "")).strip()
+                                            if m_owner2_last != "None" and not pd.isna(row.get(m_owner2_last))
+                                            else ""
+                                        )
                                         owner2_name = f"{owner2_first} {owner2_last}".strip()
                                         if owner2_name:
                                             owner_names_parts.append(owner2_name)
                                     if m_owner3_first != "None" and not pd.isna(row.get(m_owner3_first)):
                                         owner3_first = str(row[m_owner3_first]).strip()
-                                        owner3_last = str(row.get(m_owner3_last, "")).strip() if m_owner3_last != "None" and not pd.isna(row.get(m_owner3_last)) else ""
+                                        owner3_last = (
+                                            str(row.get(m_owner3_last, "")).strip()
+                                            if m_owner3_last != "None" and not pd.isna(row.get(m_owner3_last))
+                                            else ""
+                                        )
                                         owner3_name = f"{owner3_first} {owner3_last}".strip()
                                         if owner3_name:
                                             owner_names_parts.append(owner3_name)
                                     if m_owner4_first != "None" and not pd.isna(row.get(m_owner4_first)):
                                         owner4_first = str(row[m_owner4_first]).strip()
-                                        owner4_last = str(row.get(m_owner4_last, "")).strip() if m_owner4_last != "None" and not pd.isna(row.get(m_owner4_last)) else ""
+                                        owner4_last = (
+                                            str(row.get(m_owner4_last, "")).strip()
+                                            if m_owner4_last != "None" and not pd.isna(row.get(m_owner4_last))
+                                            else ""
+                                        )
                                         owner4_name = f"{owner4_first} {owner4_last}".strip()
                                         if owner4_name:
                                             owner_names_parts.append(owner4_name)
-                                    
-                                    # If multiple owners, set owner_name directly (core.py will use it)
+
                                     if len(owner_names_parts) > 1:
                                         payload["owner_name"] = " / ".join(owner_names_parts)
-                                        # Clear owner_first/owner_last so core.py uses owner_name instead
                                         payload.pop("owner_first", None)
                                         payload.pop("owner_last", None)
 
-                                    # Mailing Address, City, State, Zip
                                     if m_mail_addr != "None" and not pd.isna(row.get(m_mail_addr)):
                                         payload["mailing_address"] = str(row[m_mail_addr]).strip()[:255]
                                     if m_mail_city != "None" and not pd.isna(row.get(m_mail_city)):
@@ -1441,7 +1450,6 @@ with tab2:
                                     if m_mail_zip != "None" and not pd.isna(row.get(m_mail_zip)):
                                         payload["mailing_zip"] = str(row[m_mail_zip]).strip()[:20]
 
-                                    # Phone 1, 2, 3, 4
                                     phones = []
                                     for ph in [m_phone1, m_phone2, m_phone3, m_phone4]:
                                         if ph != "None" and not pd.isna(row.get(ph)) and str(row[ph]).strip():
@@ -1449,7 +1457,6 @@ with tab2:
                                     if phones:
                                         payload["phone_numbers"] = ", ".join(phones)
 
-                                    # Property Details
                                     if m_apn != "None" and not pd.isna(row.get(m_apn)):
                                         payload["apn"] = str(row[m_apn]).strip()[:50]
                                     if m_prop_type != "None" and not pd.isna(row.get(m_prop_type)):
@@ -1462,21 +1469,26 @@ with tab2:
                                         payload["subdivision"] = str(row[m_subdivision]).strip()[:200]
                                     if m_legal_desc != "None" and not pd.isna(row.get(m_legal_desc)):
                                         payload["legal_description"] = str(row[m_legal_desc]).strip()[:500]
-                                    
-                                    # Property Size & Structure
+
                                     if m_living_sqft != "None" and not pd.isna(row.get(m_living_sqft)):
                                         try:
-                                            payload["living_sqft"] = int(float(str(row[m_living_sqft]).replace(',', '').strip()))
+                                            payload["living_sqft"] = int(
+                                                float(str(row[m_living_sqft]).replace(",", "").strip())
+                                            )
                                         except Exception:
                                             pass
                                     if m_lot_acres != "None" and not pd.isna(row.get(m_lot_acres)):
                                         try:
-                                            payload["lot_acres"] = float(str(row[m_lot_acres]).replace(',', '').strip())
+                                            payload["lot_acres"] = float(
+                                                str(row[m_lot_acres]).replace(",", "").strip()
+                                            )
                                         except Exception:
                                             pass
                                     if m_lot_sqft != "None" and not pd.isna(row.get(m_lot_sqft)):
                                         try:
-                                            payload["lot_sqft"] = int(float(str(row[m_lot_sqft]).replace(',', '').strip()))
+                                            payload["lot_sqft"] = int(
+                                                float(str(row[m_lot_sqft]).replace(",", "").strip())
+                                            )
                                         except Exception:
                                             pass
                                     if m_year_built != "None" and not pd.isna(row.get(m_year_built)):
@@ -1509,31 +1521,38 @@ with tab2:
                                             payload["fireplaces"] = int(float(row[m_fireplaces]))
                                         except Exception:
                                             pass
-                                    
-                                    # Garage & Carport
+
                                     if m_garage_type != "None" and not pd.isna(row.get(m_garage_type)):
                                         payload["garage_type"] = str(row[m_garage_type]).strip()[:50]
                                     if m_garage_sqft != "None" and not pd.isna(row.get(m_garage_sqft)):
                                         try:
-                                            payload["garage_sqft"] = int(float(str(row[m_garage_sqft]).replace(',', '').strip()))
+                                            payload["garage_sqft"] = int(
+                                                float(str(row[m_garage_sqft]).replace(",", "").strip())
+                                            )
                                         except Exception:
                                             pass
                                     if m_carport != "None" and not pd.isna(row.get(m_carport)):
                                         carport_val = str(row[m_carport]).strip().lower()
-                                        payload["carport"] = carport_val in ['yes', 'y', 'true', '1', 'has carport']
+                                        payload["carport"] = carport_val in [
+                                            "yes",
+                                            "y",
+                                            "true",
+                                            "1",
+                                            "has carport",
+                                        ]
                                     if m_carport_area != "None" and not pd.isna(row.get(m_carport_area)):
                                         try:
-                                            payload["carport_area"] = int(float(str(row[m_carport_area]).replace(',', '').strip()))
+                                            payload["carport_area"] = int(
+                                                float(str(row[m_carport_area]).replace(",", "").strip())
+                                            )
                                         except Exception:
                                             pass
-                                    
-                                    # HVAC
+
                                     if m_ac_type != "None" and not pd.isna(row.get(m_ac_type)):
                                         payload["ac_type"] = str(row[m_ac_type]).strip()[:50]
                                     if m_heating_type != "None" and not pd.isna(row.get(m_heating_type)):
                                         payload["heating_type"] = str(row[m_heating_type]).strip()[:50]
-                                    
-                                    # Owner Info
+
                                     if m_ownership_months != "None" and not pd.isna(row.get(m_ownership_months)):
                                         try:
                                             payload["ownership_length_months"] = int(float(row[m_ownership_months]))
@@ -1543,48 +1562,69 @@ with tab2:
                                         payload["owner_type"] = str(row[m_owner_type]).strip()[:50]
                                     if m_owner_occupied != "None" and not pd.isna(row.get(m_owner_occupied)):
                                         occupied_val = str(row[m_owner_occupied]).strip().lower()
-                                        payload["owner_occupied"] = occupied_val in ['yes', 'y', 'true', '1', 'owner occupied']
+                                        payload["owner_occupied"] = occupied_val in [
+                                            "yes",
+                                            "y",
+                                            "true",
+                                            "1",
+                                            "owner occupied",
+                                        ]
                                     if m_vacant != "None" and not pd.isna(row.get(m_vacant)):
                                         vacant_val = str(row[m_vacant]).strip().lower()
-                                        payload["vacant"] = vacant_val in ['yes', 'y', 'true', '1', 'vacant']
-                                    
-                                    # Financial
+                                        payload["vacant"] = vacant_val in [
+                                            "yes",
+                                            "y",
+                                            "true",
+                                            "1",
+                                            "vacant",
+                                        ]
+
                                     if m_occ != "None" and not pd.isna(row.get(m_occ)):
                                         occ_val = str(row[m_occ]).strip()
-                                        if occ_val.lower() in ['vacant', 'v', 'empty']:
+                                        if occ_val.lower() in ["vacant", "v", "empty"]:
                                             payload["occupancy_status"] = "Vacant"
-                                        elif occ_val.lower() in ['occupied', 'occ', 'owner occupied']:
+                                        elif occ_val.lower() in ["occupied", "occ", "owner occupied"]:
                                             payload["occupancy_status"] = "Occupied"
                                         else:
                                             payload["occupancy_status"] = occ_val
                                     if m_value != "None" and not pd.isna(row.get(m_value)):
                                         try:
-                                            val = str(row[m_value]).replace('$', '').replace(',', '').strip()
+                                            val = str(row[m_value]).replace("$", "").replace(",", "").strip()
                                             payload["est_value"] = float(val)
                                         except Exception:
                                             pass
                                     if m_sale_price != "None" and not pd.isna(row.get(m_sale_price)):
                                         try:
-                                            val = str(row[m_sale_price]).replace('$', '').replace(',', '').strip()
+                                            val = str(row[m_sale_price]).replace("$", "").replace(",", "").strip()
                                             payload["last_sale_price"] = float(val)
                                         except Exception:
                                             pass
 
-                                    # Insert (no duplicate check)
-                                    stack_lead(payload)
+                                    batch.append(payload)
                                     stats["new"] += 1
-                                except Exception as e:
+
+                                    if len(batch) >= BATCH_SIZE:
+                                        bulk_insert_leads(batch)
+                                        batch = []
+
+                                except Exception:
                                     stats["error"] += 1
-                                    with err_container:
-                                        st.error(f"Row {i+2}: {str(e)[:100]}")
+
                                 prog.progress((i + 1) / len(raw_df))
                                 status.text(f"Processed {i+1}/{len(raw_df)}")
 
+                            if batch:
+                                bulk_insert_leads(batch)
+
                             st.success(f"✅ New: {stats['new']}, Errors: {stats['error']}, Skipped: {stats['skipped']}")
-                            if stats['new'] > 0:
+                            if stats["new"] > 0:
                                 st.balloons()
                                 try:
-                                    list_name = source_name.strip() if (source_name and source_name.strip()) else uploaded_file.name
+                                    list_name = (
+                                        source_name.strip()
+                                        if (source_name and source_name.strip())
+                                        else uploaded_file.name
+                                    )
                                     add_uploaded_list(list_name, uploaded_file.name)
                                 except Exception:
                                     pass
