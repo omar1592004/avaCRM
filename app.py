@@ -1647,7 +1647,7 @@ elif page_key == "Import":
             with pd2: ml_beds  = st.number_input("Beds",  0, 20, 0)
             with pd3: ml_baths = st.number_input("Baths", 0, 20, 0)
             with pd4: ml_sqft  = st.number_input("SqFt",  0, 50000, 0, step=100)
-            with pd5: ml_yr    = st.number_input("Year Built", 1800, 2025, 0)
+            with pd5: ml_yr    = st.number_input("Year Built", 0, 2025, 0)
 
             st.markdown("**💰 Financial** *(optional)*")
             pf1,pf2,pf3 = st.columns(3)
