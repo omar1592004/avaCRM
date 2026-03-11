@@ -127,24 +127,55 @@ st.set_page_config(
 )
 
 # ─────────────────────────────────────────────
-# GLOBAL CSS  — Salesforce-inspired, data-dense
+# GLOBAL CSS  — Dark theme, data-dense
 # ─────────────────────────────────────────────
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
+/* ── CSS Variables ── */
+:root {
+    --bg-base:       #0d1117;
+    --bg-surface:    #161b22;
+    --bg-elevated:   #1c2333;
+    --bg-hover:      #21262d;
+    --border:        #30363d;
+    --border-subtle: #21262d;
+    --text-primary:  #e6edf3;
+    --text-secondary:#8b949e;
+    --text-muted:    #484f58;
+    --accent:        #2f81f7;
+    --accent-hover:  #388bfd;
+    --green:         #3fb950;
+    --yellow:        #d29922;
+    --red:           #f85149;
+    --purple:        #a371f7;
+    --orange:        #fb8f44;
+}
+
 /* ── Reset & base ── */
-html, body, [class*="css"] { font-family: 'Inter', sans-serif !important; }
-.main .block-container { padding: 1.5rem 2rem 3rem 2rem !important; max-width: 100% !important; }
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif !important;
+    color: var(--text-primary) !important;
+}
+.main .block-container {
+    padding: 1.5rem 2rem 3rem 2rem !important;
+    max-width: 100% !important;
+    background: var(--bg-base) !important;
+}
+
+/* ── Full app background ── */
+.stApp { background: var(--bg-base) !important; }
+.stApp > div { background: var(--bg-base) !important; }
 
 /* ── Sidebar ── */
 [data-testid="stSidebar"] {
-    background: #0b1220 !important;
-    border-right: 1px solid #1e2d45;
+    background: #0b0f17 !important;
+    border-right: 1px solid var(--border) !important;
     min-width: 220px !important;
     max-width: 220px !important;
 }
-[data-testid="stSidebar"] * { color: #c8d6e8 !important; }
+[data-testid="stSidebar"] * { color: #8b949e !important; }
 [data-testid="stSidebar"] .stRadio label {
     display: block;
     padding: 0.55rem 1rem;
@@ -152,60 +183,62 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif !important; }
     cursor: pointer;
     font-size: 0.875rem;
     font-weight: 500;
-    transition: background 0.15s;
+    transition: background 0.15s, color 0.15s;
+    color: #8b949e !important;
 }
-[data-testid="stSidebar"] .stRadio label:hover { background: #1a2e48 !important; }
+[data-testid="stSidebar"] .stRadio label:hover {
+    background: var(--bg-hover) !important;
+    color: var(--text-primary) !important;
+}
 [data-testid="stSidebar"] [data-testid="stRadio"] > div { gap: 2px !important; }
-[data-testid="stSidebar"] hr { border-color: #1e2d45 !important; }
+[data-testid="stSidebar"] hr { border-color: var(--border) !important; }
 [data-testid="stSidebarHeader"] { display: none !important; }
-
-/* ── Page background ── */
-.stApp { background: #f4f6f9 !important; }
 
 /* ── Cards ── */
 .re-card {
-    background: #ffffff;
-    border: 1px solid #e1e8f0;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 1.25rem 1.5rem;
     margin-bottom: 1rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
 }
 
 /* ── Metric tiles ── */
 .metric-tile {
-    background: #fff;
-    border: 1px solid #e1e8f0;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 1.1rem 1.4rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
 }
 .metric-tile .label {
     font-size: 0.72rem;
     font-weight: 600;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: #6b7a99;
+    color: var(--text-secondary);
     margin-bottom: 0.3rem;
 }
 .metric-tile .value {
     font-size: 1.85rem;
     font-weight: 700;
-    color: #0f1d35;
+    color: var(--text-primary);
     line-height: 1.1;
 }
 .metric-tile .delta {
     font-size: 0.78rem;
-    color: #2ecc71;
+    color: var(--green);
     margin-top: 0.25rem;
 }
-.metric-tile .delta.down { color: #e74c3c; }
+.metric-tile .delta.down { color: var(--red); }
 
 /* ── Pipeline board ── */
 .pipeline-col {
-    background: #f0f3f8;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 0.75rem;
+    padding: 0.85rem 1rem;
     min-height: 80px;
 }
 .pipeline-header {
@@ -220,39 +253,39 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif !important; }
 .pipeline-count {
     font-size: 1.6rem;
     font-weight: 700;
-    color: #0f1d35;
+    color: var(--text-primary);
 }
 .pipeline-sub {
     font-size: 0.75rem;
-    color: #6b7a99;
+    color: var(--text-secondary);
 }
 
-/* Stage colours */
-.stage-new        { color: #3498db; border-color: #3498db; }
-.stage-contacted  { color: #9b59b6; border-color: #9b59b6; }
-.stage-negotiating{ color: #f39c12; border-color: #f39c12; }
-.stage-closed     { color: #27ae60; border-color: #27ae60; }
-.stage-lost       { color: #e74c3c; border-color: #e74c3c; }
-.stage-unset      { color: #95a5a6; border-color: #95a5a6; }
+/* Stage colours — bright on dark */
+.stage-new         { color: #58a6ff; border-color: #58a6ff; }
+.stage-contacted   { color: #bc8cff; border-color: #bc8cff; }
+.stage-negotiating { color: #e3b341; border-color: #e3b341; }
+.stage-closed      { color: #3fb950; border-color: #3fb950; }
+.stage-lost        { color: #f85149; border-color: #f85149; }
+.stage-unset       { color: #484f58; border-color: #484f58; }
 
 /* ── Section headers ── */
 .section-title {
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 700;
-    color: #0f1d35;
+    color: var(--text-primary);
     margin: 0 0 1rem 0;
     padding-bottom: 0.5rem;
-    border-bottom: 2px solid #e1e8f0;
+    border-bottom: 1px solid var(--border);
 }
 .page-title {
     font-size: 1.5rem;
     font-weight: 700;
-    color: #0f1d35;
+    color: var(--text-primary);
     margin-bottom: 0.15rem;
 }
 .page-sub {
     font-size: 0.85rem;
-    color: #6b7a99;
+    color: var(--text-secondary);
     margin-bottom: 1.25rem;
 }
 
@@ -263,25 +296,89 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif !important; }
     font-size: 0.82rem !important;
     padding: 0.4rem 1rem !important;
     transition: all 0.15s !important;
+    background: var(--bg-elevated) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text-primary) !important;
+}
+.stButton > button:hover {
+    background: var(--bg-hover) !important;
+    border-color: #8b949e !important;
 }
 .stButton > button[kind="primary"] {
-    background: #0061d5 !important;
+    background: var(--accent) !important;
     border: none !important;
     color: #fff !important;
 }
-.stButton > button[kind="primary"]:hover { background: #0051b8 !important; }
+.stButton > button[kind="primary"]:hover {
+    background: var(--accent-hover) !important;
+}
 
 /* ── Inputs ── */
 .stTextInput > div > div > input,
-.stSelectbox > div > div,
-.stNumberInput > div > div > input {
+.stNumberInput > div > div > input,
+.stTextArea > div > div > textarea {
+    background: var(--bg-elevated) !important;
+    border: 1px solid var(--border) !important;
     border-radius: 6px !important;
-    border: 1px solid #d1dce8 !important;
+    color: var(--text-primary) !important;
     font-size: 0.85rem !important;
 }
+.stTextInput > div > div > input:focus,
+.stNumberInput > div > div > input:focus,
+.stTextArea > div > div > textarea:focus {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px rgba(47,129,247,0.15) !important;
+}
+.stSelectbox > div > div {
+    background: var(--bg-elevated) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 6px !important;
+    color: var(--text-primary) !important;
+}
 
-/* ── Tables ── */
-.stDataFrame { border-radius: 8px !important; border: 1px solid #e1e8f0 !important; }
+/* ── Selectbox dropdown ── */
+[data-baseweb="popover"] { background: var(--bg-elevated) !important; border: 1px solid var(--border) !important; }
+[data-baseweb="menu"] { background: var(--bg-elevated) !important; }
+[data-baseweb="option"] { background: var(--bg-elevated) !important; color: var(--text-primary) !important; }
+[data-baseweb="option"]:hover { background: var(--bg-hover) !important; }
+
+/* ── Checkboxes & radios ── */
+.stCheckbox label, .stRadio label { color: var(--text-primary) !important; font-size: 0.85rem !important; }
+
+/* ── Tables / DataFrames ── */
+.stDataFrame {
+    border-radius: 8px !important;
+    border: 1px solid var(--border) !important;
+    background: var(--bg-surface) !important;
+}
+[data-testid="stDataFrameResizable"] { background: var(--bg-surface) !important; }
+
+/* ── Expanders ── */
+.streamlit-expanderHeader {
+    font-weight: 600 !important;
+    font-size: 0.875rem !important;
+    color: var(--text-primary) !important;
+    background: var(--bg-surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 6px !important;
+}
+.streamlit-expanderContent {
+    background: var(--bg-surface) !important;
+    border: 1px solid var(--border) !important;
+    border-top: none !important;
+    border-radius: 0 0 6px 6px !important;
+}
+
+/* ── Dividers ── */
+hr { border-color: var(--border) !important; }
+
+/* ── Progress bars ── */
+.stProgress > div > div { background: var(--bg-elevated) !important; }
+.stProgress > div > div > div { background: var(--accent) !important; }
+
+/* ── Alerts / info boxes ── */
+.stAlert { background: var(--bg-surface) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; }
+[data-testid="stNotification"] { background: var(--bg-surface) !important; }
 
 /* ── Import steps ── */
 .step-badge {
@@ -289,7 +386,7 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif !important; }
     align-items: center;
     justify-content: center;
     width: 26px; height: 26px;
-    background: #0061d5;
+    background: var(--accent);
     color: #fff;
     border-radius: 50%;
     font-size: 0.75rem;
@@ -303,37 +400,45 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif !important; }
     margin-bottom: 0.5rem;
     font-size: 0.875rem;
     font-weight: 500;
-    color: #0f1d35;
+    color: var(--text-primary);
 }
 
-/* ── Expanders ── */
-.streamlit-expanderHeader { font-weight: 600 !important; font-size: 0.875rem !important; }
-
-/* ── Filter sidebar labels ── */
+/* ── Filter section labels ── */
 .filter-section {
     font-size: 0.7rem;
     font-weight: 700;
     letter-spacing: 0.07em;
     text-transform: uppercase;
-    color: #6b7a99;
+    color: var(--text-secondary);
     margin: 1rem 0 0.4rem 0;
 }
 
-/* ── Status badges ── */
-.badge {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: 12px;
-    font-size: 0.7rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-}
-.badge-new        { background: #dbeafe; color: #1d4ed8; }
-.badge-contacted  { background: #ede9fe; color: #6d28d9; }
-.badge-closed     { background: #dcfce7; color: #15803d; }
-.badge-lost       { background: #fee2e2; color: #b91c1c; }
+/* ── Captions ── */
+.stCaption, .stMarkdown p { color: var(--text-secondary) !important; }
 
-/* Hide default streamlit header chrome */
+/* ── Tabs (if used anywhere) ── */
+.stTabs [data-baseweb="tab-list"] { background: var(--bg-surface) !important; border-bottom: 1px solid var(--border) !important; }
+.stTabs [data-baseweb="tab"] { color: var(--text-secondary) !important; background: transparent !important; }
+.stTabs [aria-selected="true"] { color: var(--text-primary) !important; border-bottom: 2px solid var(--accent) !important; }
+
+/* ── Metric component ── */
+[data-testid="stMetricValue"] { color: var(--text-primary) !important; }
+[data-testid="stMetricLabel"] { color: var(--text-secondary) !important; }
+
+/* ── File uploader ── */
+[data-testid="stFileUploader"] {
+    background: var(--bg-surface) !important;
+    border: 1px dashed var(--border) !important;
+    border-radius: 8px !important;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #484f58; }
+
+/* Hide default streamlit chrome */
 #MainMenu, footer, header { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
@@ -376,8 +481,8 @@ except Exception:
 with st.sidebar:
     st.markdown("""
     <div style='padding: 1.2rem 1rem 1rem 1rem;'>
-        <div style='font-size:1.05rem;font-weight:700;color:#ffffff;letter-spacing:0.02em;'>🏠 RE Engine Pro</div>
-        <div style='font-size:0.72rem;color:#5a7a9a;margin-top:2px;'>Real Estate CRM</div>
+        <div style='font-size:1.05rem;font-weight:700;color:#e6edf3;letter-spacing:0.02em;'>🏠 RE Engine Pro</div>
+        <div style='font-size:0.72rem;color:#484f58;margin-top:2px;'>Real Estate CRM</div>
     </div>
     """, unsafe_allow_html=True)
     st.markdown("<hr style='margin:0 0 0.75rem 0;'>", unsafe_allow_html=True)
@@ -389,7 +494,7 @@ with st.sidebar:
     )
 
     st.markdown("<hr style='margin:0.75rem 0;'>", unsafe_allow_html=True)
-    st.markdown("<div style='font-size:0.68rem;font-weight:600;letter-spacing:0.08em;color:#3a5a7a;text-transform:uppercase;padding:0 1rem;margin-bottom:0.5rem;'>Market</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size:0.68rem;font-weight:600;letter-spacing:0.08em;color:#484f58;text-transform:uppercase;padding:0 1rem;margin-bottom:0.5rem;'>Market</div>", unsafe_allow_html=True)
     selected_state = st.selectbox("Market", ["All States"] + all_states, key="top_market", label_visibility="collapsed")
 
     st.markdown("<hr style='margin:0.75rem 0;'>", unsafe_allow_html=True)
@@ -944,10 +1049,10 @@ elif page_key == "Lead Engine":
                                 else: st.warning("Enter some content.")
         else:
             st.markdown("""
-            <div class="re-card" style="text-align:center;padding:3rem 2rem;color:#6b7a99;">
+            <div class="re-card" style="text-align:center;padding:3rem 2rem;">
                 <div style="font-size:2.5rem;margin-bottom:1rem;">🔍</div>
-                <div style="font-size:1rem;font-weight:600;color:#0f1d35;">Set your filters and click Run Search</div>
-                <div style="font-size:0.85rem;margin-top:0.5rem;">Results will appear here with batch actions for export, tagging, and pipeline updates.</div>
+                <div style="font-size:1rem;font-weight:600;color:#e6edf3;">Set your filters and click Run Search</div>
+                <div style="font-size:0.85rem;margin-top:0.5rem;color:#8b949e;">Results will appear here with batch actions for export, tagging, and pipeline updates.</div>
             </div>""", unsafe_allow_html=True)
 
 
@@ -1085,10 +1190,10 @@ elif page_key == "Import":
 
     if not uploaded_files:
         st.markdown("""
-        <div class="re-card" style="text-align:center;padding:2.5rem;color:#6b7a99;">
+        <div class="re-card" style="text-align:center;padding:2.5rem;">
             <div style="font-size:2rem;margin-bottom:0.75rem;">📂</div>
-            <div style="font-weight:600;color:#0f1d35;">Drop your CSV files above to get started</div>
-            <div style="font-size:0.82rem;margin-top:0.4rem;">Accepts .csv · Multiple files supported · Up to 500 rows per batch</div>
+            <div style="font-weight:600;color:#e6edf3;">Drop your CSV files above to get started</div>
+            <div style="font-size:0.82rem;margin-top:0.4rem;color:#8b949e;">Accepts .csv · Multiple files supported · Up to 500 rows per batch</div>
         </div>""", unsafe_allow_html=True)
     else:
         st.success(f"✅ {len(uploaded_files)} file(s) ready")
@@ -1332,10 +1437,10 @@ elif page_key == "My Files":
         files = list_uploaded_lists()
         if not files:
             st.markdown("""
-            <div class="re-card" style="text-align:center;padding:2.5rem;color:#6b7a99;">
+            <div class="re-card" style="text-align:center;padding:2.5rem;">
                 <div style="font-size:2rem;margin-bottom:0.75rem;">📁</div>
-                <div style="font-weight:600;color:#0f1d35;">No uploaded files yet</div>
-                <div style="font-size:0.82rem;margin-top:0.4rem;">Import a CSV in the <strong>Import</strong> page to see it here.</div>
+                <div style="font-weight:600;color:#e6edf3;">No uploaded files yet</div>
+                <div style="font-size:0.82rem;margin-top:0.4rem;color:#8b949e;">Import a CSV in the <strong>Import</strong> page to see it here.</div>
             </div>""", unsafe_allow_html=True)
         else:
             if st.button("🗑 Delete selected", type="secondary"):
@@ -1351,7 +1456,7 @@ elif page_key == "My Files":
             # Header row
             h0,h1,h2,h3,h4,h5 = st.columns([0.4,2.5,1.5,0.8,1.5,0.6])
             for h, label in zip([h0,h1,h2,h3,h4,h5], ["","List Name","Uploaded","Leads","Status","Action"]):
-                h.markdown(f"<div style='font-size:0.7rem;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:#6b7a99;'>{label}</div>", unsafe_allow_html=True)
+                h.markdown(f"<div style='font-size:0.7rem;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:#8b949e;'>{label}</div>", unsafe_allow_html=True)
             st.divider()
 
             for f in files:
