@@ -151,8 +151,24 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-html, body, [class*="css"], [class*="st-"] {
+html, body {
     font-family: 'Inter', sans-serif !important;
+}
+/* Apply Inter only to actual text — never to icon/material font elements */
+p, span:not([data-testid*="Icon"]):not(.material-icons):not([class*="icon"]),
+div:not([class*="Icon"]):not([class*="icon"]):not([data-testid*="Icon"]),
+label, input, textarea, select, button, h1, h2, h3, h4, h5, h6,
+.stMarkdown, .stText, .stCaption,
+[data-testid="stMarkdownContainer"],
+[data-testid="stWidgetLabel"] {
+    font-family: 'Inter', sans-serif !important;
+}
+/* Explicitly protect Streamlit's icon font */
+[data-testid="stExpanderToggleIcon"],
+[class*="Icon"], [class*="icon"],
+.material-icons,
+[data-baseweb="icon"] {
+    font-family: inherit !important;
 }
 
 /* ── Layout ── */
