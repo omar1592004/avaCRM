@@ -152,8 +152,26 @@ html, body, [class*="css"], [class*="st-"] {
 
 /* ── Layout ── */
 .main .block-container {
-    padding: 0.5rem 1.5rem 3rem 1.5rem !important;
+    padding: 0.5rem 2rem 3rem 2rem !important;
     max-width: 100% !important;
+    overflow-x: hidden !important;
+}
+
+/* Prevent ANY element from causing horizontal overflow */
+.stApp * {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* Columns: no overflow clipping */
+[data-testid="stHorizontalBlock"] {
+    overflow: visible !important;
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+}
+[data-testid="stColumn"] {
+    overflow: visible !important;
+    min-width: 0 !important;
 }
 
 /* ── Hide sidebar entirely — using top nav ── */
@@ -163,29 +181,37 @@ html, body, [class*="css"], [class*="st-"] {
 button[kind="header"] { display: none !important; }
 
 /* ── Horizontal radio nav styling ── */
-div[data-testid="stRadio"] > div {
-    gap: 4px !important;
-    flex-wrap: nowrap !important;
+div[data-testid="stRadio"] > div[role="radiogroup"] {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    align-items: center !important;
 }
-div[data-testid="stRadio"] label {
+div[data-testid="stRadio"] > div[role="radiogroup"] > label {
     border: 1px solid #30363d !important;
     border-radius: 6px !important;
-    padding: 0.3rem 0.8rem !important;
-    font-size: 0.82rem !important;
+    padding: 0.3rem 0.9rem !important;
+    font-size: 0.83rem !important;
     font-weight: 500 !important;
     cursor: pointer !important;
     white-space: nowrap !important;
     background: #161b22 !important;
     color: #8b949e !important;
     transition: all 0.15s !important;
+    min-width: fit-content !important;
+    display: inline-flex !important;
+    align-items: center !important;
 }
-div[data-testid="stRadio"] label:has(input:checked) {
+div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) {
     background: #2f81f7 !important;
     border-color: #2f81f7 !important;
     color: #fff !important;
     font-weight: 600 !important;
 }
-div[data-testid="stRadio"] label input { display: none !important; }
+div[data-testid="stRadio"] > div[role="radiogroup"] > label > div:first-child {
+    display: none !important;
+}
 
 
 
@@ -267,6 +293,35 @@ div[data-testid="stRadio"] label input { display: none !important; }
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+/* ── Expanders ── */
+details > summary,
+[data-testid="stExpander"] summary,
+.streamlit-expanderHeader {
+    font-weight: 600 !important;
+    font-size: 0.85rem !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    padding: 0.6rem 1rem !important;
+    line-height: 1.4 !important;
+}
+[data-testid="stExpander"] {
+    border: 1px solid #30363d !important;
+    border-radius: 6px !important;
+    overflow: visible !important;
+    margin-bottom: 0.5rem !important;
+}
+[data-testid="stExpander"] > details {
+    overflow: visible !important;
+}
+[data-testid="stExpander"] > details > summary {
+    list-style: none !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+}
 
 /* Hide Streamlit chrome */
 #MainMenu, footer, header { visibility: hidden; }
@@ -1836,4 +1891,3 @@ elif page_key == "Tags":
                         st.rerun()
         except Exception as e:
             st.error(str(e)); st.exception(e)
-            
