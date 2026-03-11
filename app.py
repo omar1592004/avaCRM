@@ -127,341 +127,113 @@ st.set_page_config(
 )
 
 # ─────────────────────────────────────────────
-# GLOBAL CSS  — Dark theme, data-dense
+# GLOBAL CSS — layout & custom components only
+# (theme colors handled by .streamlit/config.toml)
 # ─────────────────────────────────────────────
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-/* ── CSS Variables ── */
-:root {
-    --bg-base:       #0d1117;
-    --bg-surface:    #161b22;
-    --bg-elevated:   #1c2333;
-    --bg-hover:      #21262d;
-    --border:        #30363d;
-    --border-subtle: #21262d;
-    --text-primary:  #e6edf3;
-    --text-secondary:#8b949e;
-    --text-muted:    #484f58;
-    --accent:        #2f81f7;
-    --accent-hover:  #388bfd;
-    --green:         #3fb950;
-    --yellow:        #d29922;
-    --red:           #f85149;
-    --purple:        #a371f7;
-    --orange:        #fb8f44;
+html, body, [class*="css"], [class*="st-"] {
+    font-family: 'Inter', sans-serif !important;
 }
 
-/* ── Reset & base ── */
-html, body, [class*="css"] {
-    font-family: 'Inter', sans-serif !important;
-    color: var(--text-primary) !important;
-}
+/* ── Layout ── */
 .main .block-container {
     padding: 1.5rem 2rem 3rem 2rem !important;
     max-width: 100% !important;
-    background: var(--bg-base) !important;
 }
-
-/* ── Full app background ── */
-.stApp { background: var(--bg-base) !important; }
-.stApp > div { background: var(--bg-base) !important; }
 
 /* ── Sidebar ── */
 [data-testid="stSidebar"] {
-    background: #0b0f17 !important;
-    border-right: 1px solid var(--border) !important;
-    min-width: 220px !important;
-    max-width: 220px !important;
+    min-width: 230px !important;
+    max-width: 230px !important;
 }
-[data-testid="stSidebar"] * { color: #8b949e !important; }
-[data-testid="stSidebar"] .stRadio label {
-    display: block;
-    padding: 0.55rem 1rem;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.875rem;
-    font-weight: 500;
-    transition: background 0.15s, color 0.15s;
-    color: #8b949e !important;
-}
-[data-testid="stSidebar"] .stRadio label:hover {
-    background: var(--bg-hover) !important;
-    color: var(--text-primary) !important;
-}
-[data-testid="stSidebar"] [data-testid="stRadio"] > div { gap: 2px !important; }
-[data-testid="stSidebar"] hr { border-color: var(--border) !important; }
 [data-testid="stSidebarHeader"] { display: none !important; }
 
-/* ── Cards ── */
-.re-card {
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 1.25rem 1.5rem;
-    margin-bottom: 1rem;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
-}
 
-/* ── Metric tiles ── */
+
+/* ── Custom metric tiles ── */
 .metric-tile {
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
     border-radius: 8px;
     padding: 1.1rem 1.4rem;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
 }
 .metric-tile .label {
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-secondary);
-    margin-bottom: 0.3rem;
+    font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; opacity: 0.55; margin-bottom: 0.3rem;
 }
-.metric-tile .value {
-    font-size: 1.85rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    line-height: 1.1;
-}
-.metric-tile .delta {
-    font-size: 0.78rem;
-    color: var(--green);
-    margin-top: 0.25rem;
-}
-.metric-tile .delta.down { color: var(--red); }
+.metric-tile .value { font-size: 1.85rem; font-weight: 700; line-height: 1.1; }
+.metric-tile .delta { font-size: 0.78rem; color: #3fb950; margin-top: 0.25rem; }
+.metric-tile .delta.down { color: #f85149; }
 
 /* ── Pipeline board ── */
 .pipeline-col {
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
     border-radius: 8px;
     padding: 0.85rem 1rem;
     min-height: 80px;
 }
 .pipeline-header {
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    margin-bottom: 0.5rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 2px solid;
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.07em;
+    text-transform: uppercase; margin-bottom: 0.5rem;
+    padding-bottom: 0.5rem; border-bottom: 2px solid;
 }
-.pipeline-count {
-    font-size: 1.6rem;
-    font-weight: 700;
-    color: var(--text-primary);
-}
-.pipeline-sub {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
+.pipeline-count { font-size: 1.6rem; font-weight: 700; }
+.pipeline-sub   { font-size: 0.75rem; opacity: 0.5; }
+
+.stage-new         { color: #58a6ff !important; border-color: #58a6ff !important; }
+.stage-contacted   { color: #bc8cff !important; border-color: #bc8cff !important; }
+.stage-negotiating { color: #e3b341 !important; border-color: #e3b341 !important; }
+.stage-closed      { color: #3fb950 !important; border-color: #3fb950 !important; }
+.stage-lost        { color: #f85149 !important; border-color: #f85149 !important; }
+.stage-unset       { color: #484f58 !important; border-color: #484f58 !important; }
+
+/* ── Cards ── */
+.re-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1rem;
 }
 
-/* Stage colours — bright on dark */
-.stage-new         { color: #58a6ff; border-color: #58a6ff; }
-.stage-contacted   { color: #bc8cff; border-color: #bc8cff; }
-.stage-negotiating { color: #e3b341; border-color: #e3b341; }
-.stage-closed      { color: #3fb950; border-color: #3fb950; }
-.stage-lost        { color: #f85149; border-color: #f85149; }
-.stage-unset       { color: #484f58; border-color: #484f58; }
-
-/* ── Section headers ── */
+/* ── Section / page titles ── */
 .section-title {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0 0 1rem 0;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--border);
+    font-size: 1rem; font-weight: 700;
+    margin: 0 0 1rem 0; padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
 }
-.page-title {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin-bottom: 0.15rem;
-}
-.page-sub {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    margin-bottom: 1.25rem;
+.page-title  { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.15rem; }
+.page-sub    { font-size: 0.85rem; opacity: 0.55; margin-bottom: 1.25rem; }
+
+/* ── Filter labels ── */
+.filter-section {
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.07em;
+    text-transform: uppercase; opacity: 0.5; margin: 1rem 0 0.4rem 0;
 }
 
-/* ── Buttons ── */
-.stButton > button {
-    border-radius: 6px !important;
-    font-weight: 600 !important;
-    font-size: 0.82rem !important;
-    padding: 0.4rem 1rem !important;
-    transition: all 0.15s !important;
-    background: var(--bg-elevated) !important;
-    border: 1px solid var(--border) !important;
-    color: var(--text-primary) !important;
-}
-.stButton > button:hover {
-    background: var(--bg-hover) !important;
-    border-color: #8b949e !important;
-}
-.stButton > button[kind="primary"] {
-    background: var(--accent) !important;
-    border: none !important;
-    color: #fff !important;
-}
-.stButton > button[kind="primary"]:hover {
-    background: var(--accent-hover) !important;
-}
-
-/* ── Inputs ── */
-.stTextInput > div > div > input,
-.stNumberInput > div > div > input,
-.stTextArea > div > div > textarea {
-    background: var(--bg-elevated) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 6px !important;
-    color: var(--text-primary) !important;
-    font-size: 0.85rem !important;
-}
-.stTextInput > div > div > input:focus,
-.stNumberInput > div > div > input:focus,
-.stTextArea > div > div > textarea:focus {
-    border-color: var(--accent) !important;
-    box-shadow: 0 0 0 3px rgba(47,129,247,0.15) !important;
-}
-.stSelectbox > div > div {
-    background: var(--bg-elevated) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 6px !important;
-    color: var(--text-primary) !important;
-}
-
-/* ── Selectbox dropdown ── */
-[data-baseweb="popover"] { background: var(--bg-elevated) !important; border: 1px solid var(--border) !important; }
-[data-baseweb="menu"] { background: var(--bg-elevated) !important; }
-[data-baseweb="option"] { background: var(--bg-elevated) !important; color: var(--text-primary) !important; }
-[data-baseweb="option"]:hover { background: var(--bg-hover) !important; }
-
-/* ── Checkboxes & radios ── */
-.stCheckbox label, .stRadio label { color: var(--text-primary) !important; font-size: 0.85rem !important; }
-
-/* ── Tables / DataFrames ── */
-.stDataFrame {
-    border-radius: 8px !important;
-    border: 1px solid var(--border) !important;
-    background: var(--bg-surface) !important;
-}
-[data-testid="stDataFrameResizable"] { background: var(--bg-surface) !important; }
-
-/* ── Expanders ── */
-.streamlit-expanderHeader {
-    font-weight: 600 !important;
-    font-size: 0.875rem !important;
-    color: var(--text-primary) !important;
-    background: var(--bg-surface) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 6px !important;
-}
-.streamlit-expanderContent {
-    background: var(--bg-surface) !important;
-    border: 1px solid var(--border) !important;
-    border-top: none !important;
-    border-radius: 0 0 6px 6px !important;
-}
-
-/* ── Dividers ── */
-hr { border-color: var(--border) !important; }
-
-/* ── Progress bars ── */
-.stProgress > div > div { background: var(--bg-elevated) !important; }
-.stProgress > div > div > div { background: var(--accent) !important; }
-
-/* ── Alerts / info boxes ── */
-.stAlert { background: var(--bg-surface) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; }
-[data-testid="stNotification"] { background: var(--bg-surface) !important; }
-
-/* ── Import steps ── */
+/* ── Import step badges ── */
 .step-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px; height: 26px;
-    background: var(--accent);
-    color: #fff;
-    border-radius: 50%;
-    font-size: 0.75rem;
-    font-weight: 700;
-    margin-right: 0.5rem;
-    flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; background: #2f81f7; color: #fff;
+    border-radius: 50%; font-size: 0.75rem; font-weight: 700;
+    margin-right: 0.5rem; flex-shrink: 0;
 }
 .step-row {
-    display: flex;
-    align-items: center;
-    margin-bottom: 0.5rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--text-primary);
-}
-
-/* ── Filter section labels ── */
-.filter-section {
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    color: var(--text-secondary);
-    margin: 1rem 0 0.4rem 0;
-}
-
-/* ── Captions ── */
-.stCaption, .stMarkdown p { color: var(--text-secondary) !important; }
-
-/* ── Tabs (if used anywhere) ── */
-.stTabs [data-baseweb="tab-list"] { background: var(--bg-surface) !important; border-bottom: 1px solid var(--border) !important; }
-.stTabs [data-baseweb="tab"] { color: var(--text-secondary) !important; background: transparent !important; }
-.stTabs [aria-selected="true"] { color: var(--text-primary) !important; border-bottom: 2px solid var(--accent) !important; }
-
-/* ── Metric component ── */
-[data-testid="stMetricValue"] { color: var(--text-primary) !important; }
-[data-testid="stMetricLabel"] { color: var(--text-secondary) !important; }
-
-/* ── File uploader ── */
-[data-testid="stFileUploader"] {
-    background: var(--bg-surface) !important;
-    border: 1px dashed var(--border) !important;
-    border-radius: 8px !important;
-}
-
-
-/* ── Hide nav button text (we use custom HTML labels) ── */
-[data-testid="stSidebar"] .stButton > button {
-    opacity: 0 !important;
-    height: 0 !important;
-    padding: 0 !important;
-    margin: -2px 0 0 0 !important;
-    border: none !important;
-    background: transparent !important;
-    position: absolute !important;
-    width: 100% !important;
-    cursor: pointer !important;
-    z-index: 10 !important;
-}
-[data-testid="stSidebar"] .stButton {
-    position: relative !important;
-    margin-top: -42px !important;
-    height: 38px !important;
-    z-index: 5 !important;
+    display: flex; align-items: center; margin-bottom: 0.5rem;
+    font-size: 0.875rem; font-weight: 500;
 }
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #0d1117; }
-::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #484f58; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
 
 /* Hide Streamlit chrome */
 #MainMenu, footer, header { visibility: hidden; }
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -501,37 +273,31 @@ except Exception:
 # SIDEBAR NAV
 # ─────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("""
-    <div style='padding:1.2rem 1rem 0.8rem 1rem;border-bottom:1px solid #30363d;margin-bottom:0.75rem;'>
-        <div style='font-size:1.1rem;font-weight:700;color:#e6edf3;'>🏠 RE Engine Pro</div>
-        <div style='font-size:0.72rem;color:#8b949e;margin-top:3px;'>Real Estate CRM</div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("## 🏠 RE Engine Pro")
+    st.caption("Real Estate CRM")
+    st.divider()
 
-    PAGES = ["📈 Dashboard", "🔍 Lead Engine", "📊 Pipeline", "📥 Import", "📁 My Files", "🏷 Tags"]
     if "current_page" not in st.session_state:
-        st.session_state["current_page"] = "📈 Dashboard"
+        st.session_state["current_page"] = "Dashboard"
 
-    for p in PAGES:
-        is_active = st.session_state["current_page"] == p
-        bg = "#21262d" if is_active else "transparent"
-        color = "#e6edf3" if is_active else "#8b949e"
-        border = "border-left:3px solid #2f81f7;" if is_active else "border-left:3px solid transparent;"
-        st.markdown(f"""
-        <div style='padding:0.55rem 1rem;border-radius:6px;margin-bottom:2px;
-                    background:{bg};{border}cursor:pointer;'>
-            <span style='color:{color};font-size:0.875rem;font-weight:{"600" if is_active else "400"};'>{p}</span>
-        </div>""", unsafe_allow_html=True)
-        if st.button(p, key=f"nav_{p}", use_container_width=True,
-                     help=p.split(" ", 1)[-1]):
-            st.session_state["current_page"] = p
+    NAV = {
+        "Dashboard":   "📈  Dashboard",
+        "Lead Engine": "🔍  Lead Engine",
+        "Pipeline":    "📊  Pipeline",
+        "Import":      "📥  Import",
+        "My Files":    "📁  My Files",
+        "Tags":        "🏷  Tags",
+    }
+    for key, label in NAV.items():
+        if st.button(label, key=f"nav_{key}", use_container_width=True):
+            st.session_state["current_page"] = key
             st.rerun()
 
-    st.markdown("<div style='border-top:1px solid #30363d;margin:0.75rem 0;'></div>", unsafe_allow_html=True)
-    st.markdown("<div style='font-size:0.68rem;font-weight:600;letter-spacing:0.08em;color:#484f58;text-transform:uppercase;padding:0 0.25rem;margin-bottom:0.4rem;'>Market Filter</div>", unsafe_allow_html=True)
-    selected_state = st.selectbox("Market", ["All States"] + all_states, key="top_market", label_visibility="collapsed")
+    st.divider()
+    st.caption("MARKET FILTER")
+    selected_state = st.selectbox("State", ["All States"] + all_states, key="top_market", label_visibility="collapsed")
 
-    st.markdown("<div style='border-top:1px solid #30363d;margin:0.75rem 0;'></div>", unsafe_allow_html=True)
+    st.divider()
     with st.expander("⚙️ Data Management"):
         clear_scope = st.selectbox("Scope", ["All states"] + sorted(all_states), key="clear_scope")
         state_to_clear = None if clear_scope == "All states" else clear_scope
@@ -570,8 +336,7 @@ if not _db_ok:
 # ─────────────────────────────────────────────
 # CURRENT PAGE
 # ─────────────────────────────────────────────
-page = st.session_state.get("current_page", "📈 Dashboard")
-page_key = page.split(" ", 1)[-1].strip()  # e.g. "Dashboard"
+page_key = st.session_state.get("current_page", "Dashboard")
 
 # ═══════════════════════════════════════════════════════════════
 # PAGE: DASHBOARD
