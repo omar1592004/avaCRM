@@ -162,9 +162,8 @@ html, body, [class*="css"], [class*="st-"] {
     overflow-x: hidden !important;
 }
 
-/* Prevent ANY element from causing horizontal overflow */
+/* Box sizing fix */
 .stApp * {
-    max-width: 100% !important;
     box-sizing: border-box !important;
 }
 
@@ -299,33 +298,30 @@ div[data-testid="stRadio"] > div[role="radiogroup"] > label > div:first-child {
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
 
-/* ── Expanders ── */
-details > summary,
-[data-testid="stExpander"] summary,
-.streamlit-expanderHeader {
-    font-weight: 600 !important;
-    font-size: 0.85rem !important;
-    white-space: normal !important;
-    word-break: break-word !important;
-    overflow: visible !important;
-    text-overflow: unset !important;
-    padding: 0.6rem 1rem !important;
-    line-height: 1.4 !important;
-}
+/* ── Expanders — scoped ONLY to stExpander, never touches dataframe internals ── */
 [data-testid="stExpander"] {
     border: 1px solid #30363d !important;
     border-radius: 6px !important;
-    overflow: visible !important;
     margin-bottom: 0.5rem !important;
 }
-[data-testid="stExpander"] > details {
-    overflow: visible !important;
-}
 [data-testid="stExpander"] > details > summary {
-    list-style: none !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 0.5rem !important;
+    font-weight: 600 !important;
+    font-size: 0.85rem !important;
+    padding: 0.6rem 1rem !important;
+    line-height: 1.4 !important;
+    cursor: pointer !important;
+}
+/* Hide the Raw Data expander that Streamlit adds under charts/dataframes */
+[data-testid="stExpander"]:has(> details > summary:contains("Raw Data")) {
+    display: none !important;
+}
+/* Dataframe toolbar — hide the raw data text label */
+[data-testid="stDataFrameToolbar"],
+[data-testid="stElementToolbar"] { 
+    opacity: 1 !important;
+}
+[data-testid="stElementToolbarButton"] ~ span {
+    display: none !important;
 }
 
 /* Hide Streamlit chrome */
@@ -353,6 +349,32 @@ setTimeout(forceOpenSidebar, 500);
 </script>
 ''', unsafe_allow_html=True)
 
+
+
+# Remove "Raw Data" expanders injected by Streamlit
+st.markdown("""
+<script>
+const removeRawData = () => {
+    // Remove any expander/details whose summary text is "Raw Data"
+    document.querySelectorAll('details > summary, [data-testid="stExpanderToggleIcon"] ~ span').forEach(el => {
+        if (el.textContent && el.textContent.trim() === 'Raw Data') {
+            const parent = el.closest('details') || el.closest('[data-testid="stExpander"]');
+            if (parent) parent.style.display = 'none';
+        }
+    });
+    // Also hide the element toolbar raw data button
+    document.querySelectorAll('[data-testid="stElementToolbar"]').forEach(toolbar => {
+        toolbar.querySelectorAll('button[title="Raw data"], button[aria-label="Raw data"]').forEach(btn => {
+            btn.style.display = 'none';
+        });
+    });
+};
+// Run on load and after each Streamlit re-render
+removeRawData();
+const observer = new MutationObserver(removeRawData);
+observer.observe(document.body, { childList: true, subtree: true });
+</script>
+""", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
 # DB INIT
@@ -1928,4 +1950,3 @@ elif page_key == "Tags":
                         st.rerun()
         except Exception as e:
             st.error(str(e)); st.exception(e)
-            
