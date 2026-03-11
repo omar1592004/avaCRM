@@ -298,31 +298,7 @@ div[data-testid="stRadio"] > div[role="radiogroup"] > label > div:first-child {
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
 
-/* ── Expanders — scoped ONLY to stExpander, never touches dataframe internals ── */
-[data-testid="stExpander"] {
-    border: 1px solid #30363d !important;
-    border-radius: 6px !important;
-    margin-bottom: 0.5rem !important;
-}
-[data-testid="stExpander"] > details > summary {
-    font-weight: 600 !important;
-    font-size: 0.85rem !important;
-    padding: 0.6rem 1rem !important;
-    line-height: 1.4 !important;
-    cursor: pointer !important;
-}
-/* Hide the Raw Data expander that Streamlit adds under charts/dataframes */
-[data-testid="stExpander"]:has(> details > summary:contains("Raw Data")) {
-    display: none !important;
-}
-/* Dataframe toolbar — hide the raw data text label */
-[data-testid="stDataFrameToolbar"],
-[data-testid="stElementToolbar"] { 
-    opacity: 1 !important;
-}
-[data-testid="stElementToolbarButton"] ~ span {
-    display: none !important;
-}
+/* ── Expanders — NO custom styling, let Streamlit render natively ── */
 
 /* Hide Streamlit chrome */
 #MainMenu, footer, header { visibility: hidden; }
@@ -350,31 +326,6 @@ setTimeout(forceOpenSidebar, 500);
 ''', unsafe_allow_html=True)
 
 
-
-# Remove "Raw Data" expanders injected by Streamlit
-st.markdown("""
-<script>
-const removeRawData = () => {
-    // Remove any expander/details whose summary text is "Raw Data"
-    document.querySelectorAll('details > summary, [data-testid="stExpanderToggleIcon"] ~ span').forEach(el => {
-        if (el.textContent && el.textContent.trim() === 'Raw Data') {
-            const parent = el.closest('details') || el.closest('[data-testid="stExpander"]');
-            if (parent) parent.style.display = 'none';
-        }
-    });
-    // Also hide the element toolbar raw data button
-    document.querySelectorAll('[data-testid="stElementToolbar"]').forEach(toolbar => {
-        toolbar.querySelectorAll('button[title="Raw data"], button[aria-label="Raw data"]').forEach(btn => {
-            btn.style.display = 'none';
-        });
-    });
-};
-// Run on load and after each Streamlit re-render
-removeRawData();
-const observer = new MutationObserver(removeRawData);
-observer.observe(document.body, { childList: true, subtree: true });
-</script>
-""", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
 # DB INIT
