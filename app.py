@@ -152,23 +152,34 @@ html, body, [class*="css"], [class*="st-"] {
 
 /* ── Layout ── */
 .main .block-container {
-    padding: 1.5rem 2rem 3rem 2rem !important;
+    padding: 0.5rem 1.5rem 3rem 1.5rem !important;
     max-width: 100% !important;
 }
 
-/* ── Sidebar ── */
+/* ── Hide sidebar entirely — using top nav ── */
 [data-testid="stSidebar"],
-[data-testid="stSidebar"] > div,
-[data-testid="stSidebar"] > div > div {
-    min-width: 240px !important;
-    max-width: 240px !important;
-    width: 240px !important;
+[data-testid="stSidebarCollapseButton"],
+[data-testid="stSidebarNav"],
+button[kind="header"] { display: none !important; }
+
+/* ── Top nav button row ── */
+div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] .stButton > button {
+    border-radius: 6px !important;
+    font-size: 0.82rem !important;
+    font-weight: 600 !important;
+    padding: 0.35rem 0.5rem !important;
+    width: 100% !important;
 }
-section[data-testid="stSidebar"] {
-    display: block !important;
-    visibility: visible !important;
+div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] .stButton > button[kind="primary"] {
+    background: #2f81f7 !important;
+    border-color: #2f81f7 !important;
+    color: #fff !important;
 }
-[data-testid="stSidebarCollapseButton"] { display: none !important; }
+div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] .stButton > button[kind="secondary"] {
+    background: #161b22 !important;
+    border-color: #30363d !important;
+    color: #8b949e !important;
+}
 
 
 
@@ -312,31 +323,51 @@ except Exception:
 # ─────────────────────────────────────────────
 # SIDEBAR NAV
 # ─────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("## 🏠 RE Engine Pro")
-    st.caption("Real Estate CRM")
-    st.divider()
+# ── TOP NAV BAR ──
+if "current_page" not in st.session_state:
+    st.session_state["current_page"] = "Dashboard"
 
-    page_key = st.radio(
-        "Navigation",
-        ["Dashboard", "Lead Engine", "Pipeline", "Import", "My Files", "Tags"],
-        format_func=lambda x: {
-            "Dashboard":   "📈  Dashboard",
-            "Lead Engine": "🔍  Lead Engine",
-            "Pipeline":    "📊  Pipeline",
-            "Import":      "📥  Import",
-            "My Files":    "📁  My Files",
-            "Tags":        "🏷  Tags",
-        }[x],
-        label_visibility="collapsed",
-    )
+PAGES = ["Dashboard", "Lead Engine", "Pipeline", "Import", "My Files", "Tags"]
+ICONS = {"Dashboard":"📈","Lead Engine":"🔍","Pipeline":"📊","Import":"📥","My Files":"📁","Tags":"🏷"}
 
-    st.divider()
-    st.caption("MARKET FILTER")
-    selected_state = st.selectbox("State", ["All States"] + all_states, key="top_market", label_visibility="collapsed")
+st.markdown("""
+<div style="display:flex;align-items:center;justify-content:space-between;
+     padding:0.6rem 1.5rem;background:#161b22;border-bottom:1px solid #30363d;
+     margin:-1rem -2rem 1.5rem -2rem;position:sticky;top:0;z-index:999;">
+  <div style="font-size:1rem;font-weight:700;color:#e6edf3;white-space:nowrap;">
+    🏠 RE Engine Pro
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
-    st.divider()
-    with st.expander("⚙️ Data Management"):
+nav_cols = st.columns(len(PAGES))
+for i, pg in enumerate(PAGES):
+    active = st.session_state["current_page"] == pg
+    with nav_cols[i]:
+        label = f"{ICONS[pg]} {pg}"
+        if st.button(label, key=f"topnav_{pg}", use_container_width=True,
+                     type="primary" if active else "secondary"):
+            st.session_state["current_page"] = pg
+            st.rerun()
+
+st.markdown("<div style='border-bottom:1px solid #30363d;margin-bottom:1.25rem;'></div>",
+            unsafe_allow_html=True)
+
+page_key = st.session_state["current_page"]
+
+# Market filter — shown inline on relevant pages
+selected_state = "All States"
+if page_key in ("Lead Engine", "Pipeline", "Dashboard"):
+    _sf_col, _ = st.columns([2, 5])
+    with _sf_col:
+        selected_state = st.selectbox(
+            "🌎 Market", ["All States"] + all_states,
+            key="top_market", label_visibility="visible"
+        )
+
+# Data management in a small expander at bottom (only on Dashboard)
+if page_key == "Dashboard":
+    with st.expander("⚙️ Data Management", expanded=False):
         clear_scope = st.selectbox("Scope", ["All states"] + sorted(all_states), key="clear_scope")
         state_to_clear = None if clear_scope == "All states" else clear_scope
         count_c = 0
@@ -374,7 +405,7 @@ if not _db_ok:
 # ─────────────────────────────────────────────
 # CURRENT PAGE
 # ─────────────────────────────────────────────
-# page_key already set by sidebar radio above
+# page_key set by top nav above
 
 # ═══════════════════════════════════════════════════════════════
 # PAGE: DASHBOARD
@@ -900,7 +931,7 @@ elif page_key == "Lead Engine":
 
             # Batch toolbar — shown below tabs
             st.markdown("<div style='margin-top:0.5rem;'></div>", unsafe_allow_html=True)
-            b1, b2, b3, b4, b5, b6, b7 = st.columns([1,1,1,1,1,1,2])
+            b1, b2, b3, b4, b5, b6 = st.columns([1,1,1,1,1,2])
             with b1:
                 if st.button("☑ All",    key="btn_sel_all"):   st.session_state["select_all_leads"] = True;  st.rerun()
             with b2:
@@ -912,8 +943,6 @@ elif page_key == "Lead Engine":
             with b5:
                 if st.button("📤 Export", key="batch_export"):  st.session_state["batch_action"] = "export"
             with b6:
-                if st.button("🔍 Skip Trace", key="batch_skip"): st.session_state["batch_action"] = "skip_trace"
-            with b7:
                 if st.button("🗑 Delete", key="batch_delete"):  st.session_state["batch_action"] = "delete"
 
             # Hide empty columns
@@ -1226,262 +1255,435 @@ elif page_key == "Pipeline":
 # PAGE: IMPORT
 # ═══════════════════════════════════════════════════════════════
 elif page_key == "Import":
-    st.markdown('<div class="page-title">Bulk Import</div>', unsafe_allow_html=True)
-    st.markdown('<div class="page-sub">Upload CSV lists, map columns, and import leads in seconds.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">📥 Import</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-sub">Upload CSV lists, add phone numbers, or enter leads manually.</div>', unsafe_allow_html=True)
 
-    # ── How it works ──
-    with st.expander("ℹ️ How it works", expanded=False):
-        st.markdown("""
-        <div class="step-row"><div class="step-badge">1</div> Upload one or more CSV files below.</div>
-        <div class="step-row"><div class="step-badge">2</div> Columns are auto-matched by header name — adjust if needed.</div>
-        <div class="step-row"><div class="step-badge">3</div> Click <strong>Import</strong>. Duplicate addresses bump the motivation score; new addresses are inserted.</div>
-        <div class="step-row"><div class="step-badge">4</div> Results appear in <strong>Lead Engine</strong> immediately.</div>
-        """, unsafe_allow_html=True)
+    import_tab1, import_tab2, import_tab3 = st.tabs(["📂 CSV Lead Import", "📞 Add Phone Numbers", "✏️ Manual Lead Entry"])
 
-    ic1, ic2 = st.columns([2, 1])
-    with ic1:
-        source_name = st.text_input("List source name", placeholder="e.g. Foreclosure list — OH — March 2025", key="bulk_source")
-    with ic2:
-        st.markdown("<div style='margin-top:1.75rem;'></div>", unsafe_allow_html=True)
-        uploaded_files = st.file_uploader("Upload CSV(s)", type=["csv"], accept_multiple_files=True, key="bulk_uploader", label_visibility="collapsed")
+    # ═══════════════════════════════════════════════════════════════
+    # TAB 1 — CSV BULK IMPORT
+    # ═══════════════════════════════════════════════════════════════
+    with import_tab1:
+        with st.expander("ℹ️ How it works", expanded=False):
+            st.markdown("""
+            <div class="step-row"><div class="step-badge">1</div> Upload one or more CSV files below.</div>
+            <div class="step-row"><div class="step-badge">2</div> Columns are auto-matched by header name — adjust if needed.</div>
+            <div class="step-row"><div class="step-badge">3</div> Click <strong>Import</strong>. Duplicate addresses bump the motivation score; new addresses are inserted.</div>
+            <div class="step-row"><div class="step-badge">4</div> Results appear in <strong>Lead Engine</strong> immediately.</div>
+            """, unsafe_allow_html=True)
 
-    if not uploaded_files:
-        st.markdown("""
-        <div class="re-card" style="text-align:center;padding:2.5rem;">
-            <div style="font-size:2rem;margin-bottom:0.75rem;">📂</div>
-            <div style="font-weight:600;color:#e6edf3;">Drop your CSV files above to get started</div>
-            <div style="font-size:0.82rem;margin-top:0.4rem;color:#8b949e;">Accepts .csv · Multiple files supported · Up to 500 rows per batch</div>
-        </div>""", unsafe_allow_html=True)
-    else:
-        st.success(f"✅ {len(uploaded_files)} file(s) ready")
-        file_tabs = st.tabs([f"📄 {f.name}" for f in uploaded_files])
+        ic1, ic2 = st.columns([2, 1])
+        with ic1:
+            source_name = st.text_input("List source name", placeholder="e.g. Foreclosure list — OH — March 2025", key="bulk_source")
+        with ic2:
+            st.markdown("<div style='margin-top:1.75rem;'></div>", unsafe_allow_html=True)
+            uploaded_files = st.file_uploader("Upload CSV(s)", type=["csv"], accept_multiple_files=True, key="bulk_uploader", label_visibility="collapsed")
 
-        for idx, (tab, uploaded_file) in enumerate(zip(file_tabs, uploaded_files)):
-            with tab:
+        if not uploaded_files:
+            st.markdown("""
+            <div class="re-card" style="text-align:center;padding:2.5rem;">
+                <div style="font-size:2rem;margin-bottom:0.75rem;">📂</div>
+                <div style="font-weight:600;color:#e6edf3;">Drop your CSV files above to get started</div>
+                <div style="font-size:0.82rem;margin-top:0.4rem;color:#8b949e;">Accepts .csv · Multiple files supported · Up to 500 rows per batch</div>
+            </div>""", unsafe_allow_html=True)
+        else:
+            st.success(f"✅ {len(uploaded_files)} file(s) ready")
+            file_tabs = st.tabs([f"📄 {f.name}" for f in uploaded_files])
+
+            for idx, (tab, uploaded_file) in enumerate(zip(file_tabs, uploaded_files)):
+                with tab:
+                    try:
+                        try:    raw_df = pd.read_csv(uploaded_file, encoding="utf-8")
+                        except: raw_df = pd.read_csv(uploaded_file, encoding="latin-1")
+                        raw_df.columns = [str(c).strip() for c in raw_df.columns]
+
+                        with st.expander("👁 Preview first 10 rows"):
+                            st.dataframe(raw_df.head(10), use_container_width=True)
+                            st.caption(f"{len(raw_df):,} rows · {len(raw_df.columns)} columns")
+
+                        csv_cols = list(raw_df.columns)
+                        cols     = ["None"] + csv_cols
+                        di       = _default_indices(csv_cols)
+                        def _idx(k): return min(di.get(k, 0), len(cols)-1)
+
+                        st.markdown('<div class="section-title" style="margin-top:1rem;">Column Mapping</div>', unsafe_allow_html=True)
+                        st.caption("Auto-matched from your CSV headers. Adjust any dropdown if a field mapped incorrectly.")
+
+                        st.markdown("**📍 Property Location** *(required)*")
+                        e1,e2,e3,e4,e5 = st.columns(5)
+                        with e1: m_prop_addr  = st.selectbox("Address *",  cols, _idx("property_address"), key=f"prop_addr_{idx}")
+                        with e2: m_prop_city  = st.selectbox("City *",     cols, _idx("property_city"),    key=f"prop_city_{idx}")
+                        with e3: m_prop_state = st.selectbox("State *",    cols, _idx("property_state"),   key=f"prop_state_{idx}")
+                        with e4: m_prop_zip   = st.selectbox("Zip",        cols, _idx("property_zip"),     key=f"prop_zip_{idx}")
+                        with e5: m_prop_county= st.selectbox("County",     cols, _idx("property_county"),  key=f"prop_county_{idx}")
+
+                        st.markdown("**👤 Owner Name** *(at least one required)*")
+                        n1,n2 = st.columns(2)
+                        with n1: m_first = st.selectbox("First Name *", cols, _idx("first_name"), key=f"first_name_{idx}")
+                        with n2: m_last  = st.selectbox("Last Name *",  cols, _idx("last_name"),  key=f"last_name_{idx}")
+
+                        with st.expander("👥 Additional Owners (2–4)"):
+                            a1,a2 = st.columns(2)
+                            with a1: m_o2f = st.selectbox("Owner 2 First", cols, _idx("owner_2_first_name"), key=f"o2f_{idx}")
+                            with a2: m_o2l = st.selectbox("Owner 2 Last",  cols, _idx("owner_2_last_name"),  key=f"o2l_{idx}")
+                            a3,a4 = st.columns(2)
+                            with a3: m_o3f = st.selectbox("Owner 3 First", cols, _idx("owner_3_first_name"), key=f"o3f_{idx}")
+                            with a4: m_o3l = st.selectbox("Owner 3 Last",  cols, _idx("owner_3_last_name"),  key=f"o3l_{idx}")
+                            a5,a6 = st.columns(2)
+                            with a5: m_o4f = st.selectbox("Owner 4 First", cols, _idx("owner_4_first_name"), key=f"o4f_{idx}")
+                            with a6: m_o4l = st.selectbox("Owner 4 Last",  cols, _idx("owner_4_last_name"),  key=f"o4l_{idx}")
+
+                        st.markdown("**📬 Mailing Address**")
+                        m1,m2,m3,m4 = st.columns(4)
+                        with m1: m_mail_addr  = st.selectbox("Mailing Address", cols, _idx("mailing_address"), key=f"mail_addr_{idx}")
+                        with m2: m_mail_city  = st.selectbox("Mailing City",    cols, _idx("mailing_city"),    key=f"mail_city_{idx}")
+                        with m3: m_mail_state = st.selectbox("Mailing State",   cols, _idx("mailing_state"),   key=f"mail_sta_{idx}")
+                        with m4: m_mail_zip   = st.selectbox("Mailing Zip",     cols, _idx("mailing_zip"),     key=f"mail_zip_{idx}")
+
+                        st.markdown("**📞 Phone Numbers**")
+                        p1,p2,p3,p4 = st.columns(4)
+                        with p1: m_ph1 = st.selectbox("Phone 1", cols, _idx("phone_1"), key=f"ph1_{idx}")
+                        with p2: m_ph2 = st.selectbox("Phone 2", cols, _idx("phone_2"), key=f"ph2_{idx}")
+                        with p3: m_ph3 = st.selectbox("Phone 3", cols, _idx("phone_3"), key=f"ph3_{idx}")
+                        with p4: m_ph4 = st.selectbox("Phone 4", cols, _idx("phone_4"), key=f"ph4_{idx}")
+
+                        with st.expander("📊 Optional Fields (Property Details, Financials, etc.)"):
+                            st.markdown("**Property Details**")
+                            o1,o2,o3,o4 = st.columns(4)
+                            with o1: m_apn       = st.selectbox("APN",           cols, _idx("apn"),           key=f"apn_{idx}")
+                            with o2: m_prop_type = st.selectbox("Property Type", cols, _idx("property_type"), key=f"prop_type_{idx}")
+                            with o3: m_prop_use  = st.selectbox("Property Use",  cols, _idx("property_use"),  key=f"prop_use_{idx}")
+                            with o4: m_land_use  = st.selectbox("Land Use",      cols, _idx("land_use"),      key=f"land_use_{idx}")
+
+                            st.markdown("**Size & Structure**")
+                            s1,s2,s3,s4 = st.columns(4)
+                            with s1: m_sqft    = st.selectbox("Living SqFt",  cols, _idx("living_sqft"), key=f"sqft_{idx}")
+                            with s2: m_acres   = st.selectbox("Lot Acres",    cols, _idx("lot_acres"),   key=f"acres_{idx}")
+                            with s3: m_yr_blt  = st.selectbox("Year Built",   cols, _idx("year_built"),  key=f"yr_blt_{idx}")
+                            with s4: m_beds    = st.selectbox("Beds",         cols, _idx("beds"),        key=f"beds_{idx}")
+                            s5,s6,s7,s8 = st.columns(4)
+                            with s5: m_baths   = st.selectbox("Baths",        cols, _idx("baths"),       key=f"baths_{idx}")
+                            with s6: m_story   = st.selectbox("Stories",      cols, _idx("stories"),     key=f"stories_{idx}")
+                            with s7: m_units   = st.selectbox("Units",        cols, _idx("units_count"), key=f"units_{idx}")
+                            with s8: m_lotsqft = st.selectbox("Lot SqFt",     cols, _idx("lot_sqft"),    key=f"lotsqft_{idx}")
+
+                            st.markdown("**Financial**")
+                            f1,f2,f3 = st.columns(3)
+                            with f1: m_val   = st.selectbox("Est Value",       cols, _idx("est_value"),       key=f"val_{idx}")
+                            with f2: m_sale  = st.selectbox("Last Sale Price", cols, _idx("last_sale_price"), key=f"sale_{idx}")
+                            with f3: m_occ   = st.selectbox("Occupancy",       cols, _idx("occupancy"),       key=f"occ_{idx}")
+
+                            st.markdown("**Owner Info**")
+                            oi1,oi2,oi3,oi4 = st.columns(4)
+                            with oi1: m_own_months  = st.selectbox("Ownership Months", cols, _idx("ownership_length_months"), key=f"own_mo_{idx}")
+                            with oi2: m_owner_type  = st.selectbox("Owner Type",       cols, _idx("owner_type"),              key=f"own_type_{idx}")
+                            with oi3: m_owner_occ   = st.selectbox("Owner Occupied",   cols, _idx("owner_occupied"),          key=f"own_occ_{idx}")
+                            with oi4: m_vacant_col  = st.selectbox("Vacant",           cols, _idx("vacant"),                  key=f"vacant_{idx}")
+
+                            st.markdown("**Garage & HVAC**")
+                            g1,g2,g3,g4 = st.columns(4)
+                            with g1: m_garage_t = st.selectbox("Garage Type",  cols, _idx("garage_type"),  key=f"gar_t_{idx}")
+                            with g2: m_garage_s = st.selectbox("Garage SqFt",  cols, _idx("garage_sqft"),  key=f"gar_s_{idx}")
+                            with g3: m_ac       = st.selectbox("AC Type",      cols, _idx("ac_type"),      key=f"ac_{idx}")
+                            with g4: m_heat     = st.selectbox("Heating Type", cols, _idx("heating_type"), key=f"heat_{idx}")
+
+                        essential_ok = (m_prop_addr != "None" and m_prop_city != "None"
+                                        and m_prop_state != "None"
+                                        and (m_first != "None" or m_last != "None"))
+
+                        if not essential_ok:
+                            st.warning("Map at least: Property Address, City, State, and First or Last Name.")
+                        else:
+                            st.markdown("<div style='margin-top:0.75rem;'></div>", unsafe_allow_html=True)
+                            if st.button(f"⬆️ Import {uploaded_file.name}", key=f"import_{idx}", type="primary", use_container_width=True):
+                                prog   = st.progress(0)
+                                status = st.empty()
+                                stats  = {"new": 0, "error": 0, "skipped": 0}
+                                batch  = []
+                                BATCH_SIZE = 500
+
+                                for i, row in raw_df.iterrows():
+                                    try:
+                                        addr_val = row.get(m_prop_addr) if m_prop_addr != "None" else None
+                                        if pd.isna(addr_val) or str(addr_val).strip() == "":
+                                            stats["skipped"] += 1; continue
+                                        city_val  = str(row.get(m_prop_city,"")).strip()[:100]  if m_prop_city  != "None" else ""
+                                        state_val = str(row.get(m_prop_state,"")).strip().upper()[:2] if m_prop_state != "None" else ""
+                                        if not city_val or not state_val:
+                                            stats["skipped"] += 1; continue
+
+                                        payload = {"address": str(addr_val).strip()[:255], "city": city_val, "state": state_val}
+                                        if source_name: payload["source"] = source_name
+
+                                        def _s(col, maxlen=255):
+                                            if col == "None" or pd.isna(row.get(col)): return None
+                                            return str(row[col]).strip()[:maxlen]
+                                        def _i(col):
+                                            if col == "None" or pd.isna(row.get(col)): return None
+                                            try: return int(float(str(row[col]).replace(",","")))
+                                            except: return None
+                                        def _f(col):
+                                            if col == "None" or pd.isna(row.get(col)): return None
+                                            try: return float(str(row[col]).replace(",","").replace("$",""))
+                                            except: return None
+                                        def _b(col, truthy=None):
+                                            if col == "None" or pd.isna(row.get(col)): return None
+                                            return str(row[col]).strip().lower() in (truthy or ["yes","y","true","1"])
+
+                                        if _s(m_prop_zip, 20):    payload["zip"]    = _s(m_prop_zip, 20)
+                                        if _s(m_prop_county, 100): payload["county"] = _s(m_prop_county, 100)
+
+                                        of = _s(m_first, 100); ol = _s(m_last, 100)
+                                        if of: payload["owner_first"] = of
+                                        if ol: payload["owner_last"]  = ol
+
+                                        parts = []
+                                        if of or ol: parts.append(f"{of or ''} {ol or ''}".strip())
+                                        for ff, lf in [(m_o2f,m_o2l),(m_o3f,m_o3l),(m_o4f,m_o4l)]:
+                                            pf = _s(ff,100); pl = _s(lf,100)
+                                            if pf: parts.append(f"{pf} {pl or ''}".strip())
+                                        if len(parts) > 1:
+                                            payload["owner_name"] = " / ".join(parts)
+                                            payload.pop("owner_first",None); payload.pop("owner_last",None)
+
+                                        for key, col, mx in [("mailing_address",m_mail_addr,255),("mailing_city",m_mail_city,100),
+                                                              ("mailing_state",m_mail_state,2),("mailing_zip",m_mail_zip,20)]:
+                                            v = _s(col, mx)
+                                            if v: payload[key] = v
+
+                                        phones = [str(row[ph]).strip() for ph in [m_ph1,m_ph2,m_ph3,m_ph4]
+                                                  if ph != "None" and not pd.isna(row.get(ph)) and str(row[ph]).strip()]
+                                        if phones: payload["phone_numbers"] = ", ".join(phones)
+
+                                        for key, col in [("apn",m_apn),("property_type",m_prop_type),("property_use",m_prop_use),
+                                                         ("land_use",m_land_use),("garage_type",m_garage_t),
+                                                         ("ac_type",m_ac),("heating_type",m_heat),("owner_type",m_owner_type)]:
+                                            v = _s(col); v and payload.update({key: v})
+
+                                        for key, col in [("living_sqft",m_sqft),("lot_sqft",m_lotsqft),("year_built",m_yr_blt),
+                                                         ("stories",m_story),("units_count",m_units),
+                                                         ("garage_sqft",m_garage_s),("ownership_length_months",m_own_months)]:
+                                            v = _i(col)
+                                            if v is not None: payload[key] = v
+
+                                        for key, col in [("lot_acres",m_acres),("baths",m_baths),
+                                                         ("est_value",m_val),("last_sale_price",m_sale)]:
+                                            v = _f(col)
+                                            if v is not None: payload[key] = v
+
+                                        v = _i(m_beds)
+                                        if v is not None: payload["beds"] = v
+
+                                        v = _b(m_owner_occ, ["yes","y","true","1","owner occupied"])
+                                        if v is not None: payload["owner_occupied"] = v
+                                        v = _b(m_vacant_col, ["yes","y","true","1","vacant"])
+                                        if v is not None: payload["vacant"] = v
+
+                                        if m_occ != "None" and not pd.isna(row.get(m_occ)):
+                                            ov = str(row[m_occ]).strip()
+                                            payload["occupancy_status"] = (
+                                                "Vacant"   if ov.lower() in ["vacant","v","empty"] else
+                                                "Occupied" if ov.lower() in ["occupied","occ","owner occupied"] else ov
+                                            )
+
+                                        batch.append(payload)
+                                        stats["new"] += 1
+                                        if len(batch) >= BATCH_SIZE:
+                                            bulk_insert_leads(batch); batch = []
+                                    except Exception:
+                                        stats["error"] += 1
+
+                                    prog.progress((i+1)/len(raw_df))
+                                    status.text(f"Processing {i+1:,} / {len(raw_df):,}")
+
+                                if batch: bulk_insert_leads(batch)
+
+                                st.success(f"✅ Imported **{stats['new']:,}** leads · {stats['error']} errors · {stats['skipped']} skipped")
+                                if stats["new"] > 0:
+                                    st.balloons()
+                                    try:
+                                        list_name = source_name.strip() if (source_name and source_name.strip()) else uploaded_file.name
+                                        add_uploaded_list(list_name, uploaded_file.name)
+                                    except Exception:
+                                        pass
+                    except Exception as e:
+                        st.error(f"Error reading file: {e}")
+
+    # ═══════════════════════════════════════════════════════════════
+    # TAB 2 — ADD PHONE NUMBERS
+    # ═══════════════════════════════════════════════════════════════
+    with import_tab2:
+        st.markdown('<div class="section-title">📞 Add / Update Phone Numbers</div>', unsafe_allow_html=True)
+        ph_method = st.radio("Method", ["📂 Upload CSV with phones", "✏️ Type phones manually"],
+                             horizontal=True, key="ph_method")
+
+        if ph_method == "📂 Upload CSV with phones":
+            st.caption("Your CSV needs one column to match leads (address or APN) + phone number columns.")
+            phone_file = st.file_uploader("Upload phone CSV", type=["csv"], key="phone_csv_upload")
+
+            if phone_file:
                 try:
-                    try:    raw_df = pd.read_csv(uploaded_file, encoding="utf-8")
-                    except: raw_df = pd.read_csv(uploaded_file, encoding="latin-1")
-                    raw_df.columns = [str(c).strip() for c in raw_df.columns]
+                    try:    ph_df = pd.read_csv(phone_file, encoding="utf-8")
+                    except: ph_df = pd.read_csv(phone_file, encoding="latin-1")
+                    ph_df.columns = [str(c).strip() for c in ph_df.columns]
 
-                    with st.expander("👁 Preview first 10 rows"):
-                        st.dataframe(raw_df.head(10), use_container_width=True)
-                        st.caption(f"{len(raw_df):,} rows · {len(raw_df.columns)} columns")
+                    st.success(f"Loaded {len(ph_df):,} rows")
+                    with st.expander("Preview"):
+                        st.dataframe(ph_df.head(8), use_container_width=True)
 
-                    csv_cols = list(raw_df.columns)
-                    cols     = ["None"] + csv_cols
-                    di       = _default_indices(csv_cols)
-                    def _idx(k): return min(di.get(k, 0), len(cols)-1)
+                    ph_cols = ["None"] + list(ph_df.columns)
+                    mc1, mc2 = st.columns(2)
+                    with mc1: match_by  = st.selectbox("Match leads by", ["Address", "APN"], key="ph_match_by")
+                    with mc2: match_col = st.selectbox("Which column?", ph_cols, key="ph_match_col")
 
-                    st.markdown('<div class="section-title" style="margin-top:1rem;">Column Mapping</div>', unsafe_allow_html=True)
-                    st.caption("Auto-matched from your CSV headers. Adjust any dropdown if a field mapped incorrectly.")
+                    p1c,p2c,p3c,p4c = st.columns(4)
+                    with p1c: ph1_col = st.selectbox("Phone 1", ph_cols, key="ph1_col")
+                    with p2c: ph2_col = st.selectbox("Phone 2", ph_cols, key="ph2_col")
+                    with p3c: ph3_col = st.selectbox("Phone 3", ph_cols, key="ph3_col")
+                    with p4c: ph4_col = st.selectbox("Phone 4", ph_cols, key="ph4_col")
 
-                    # Essential
-                    st.markdown("**📍 Property Location** *(required)*")
-                    e1,e2,e3,e4,e5 = st.columns(5)
-                    with e1: m_prop_addr  = st.selectbox("Address *",  cols, _idx("property_address"), key=f"prop_addr_{idx}")
-                    with e2: m_prop_city  = st.selectbox("City *",     cols, _idx("property_city"),    key=f"prop_city_{idx}")
-                    with e3: m_prop_state = st.selectbox("State *",    cols, _idx("property_state"),   key=f"prop_state_{idx}")
-                    with e4: m_prop_zip   = st.selectbox("Zip",        cols, _idx("property_zip"),     key=f"prop_zip_{idx}")
-                    with e5: m_prop_county= st.selectbox("County",     cols, _idx("property_county"),  key=f"prop_county_{idx}")
+                    overwrite = st.checkbox("Overwrite existing phones (unchecked = append)", value=False, key="ph_overwrite")
 
-                    st.markdown("**👤 Owner Name** *(at least one required)*")
-                    n1,n2 = st.columns(2)
-                    with n1: m_first = st.selectbox("First Name *", cols, _idx("first_name"), key=f"first_name_{idx}")
-                    with n2: m_last  = st.selectbox("Last Name *",  cols, _idx("last_name"),  key=f"last_name_{idx}")
-
-                    with st.expander("👥 Additional Owners (2–4)"):
-                        a1,a2 = st.columns(2)
-                        with a1: m_o2f = st.selectbox("Owner 2 First", cols, _idx("owner_2_first_name"), key=f"o2f_{idx}")
-                        with a2: m_o2l = st.selectbox("Owner 2 Last",  cols, _idx("owner_2_last_name"),  key=f"o2l_{idx}")
-                        a3,a4 = st.columns(2)
-                        with a3: m_o3f = st.selectbox("Owner 3 First", cols, _idx("owner_3_first_name"), key=f"o3f_{idx}")
-                        with a4: m_o3l = st.selectbox("Owner 3 Last",  cols, _idx("owner_3_last_name"),  key=f"o3l_{idx}")
-                        a5,a6 = st.columns(2)
-                        with a5: m_o4f = st.selectbox("Owner 4 First", cols, _idx("owner_4_first_name"), key=f"o4f_{idx}")
-                        with a6: m_o4l = st.selectbox("Owner 4 Last",  cols, _idx("owner_4_last_name"),  key=f"o4l_{idx}")
-
-                    st.markdown("**📬 Mailing Address**")
-                    m1,m2,m3,m4 = st.columns(4)
-                    with m1: m_mail_addr  = st.selectbox("Mailing Address", cols, _idx("mailing_address"), key=f"mail_addr_{idx}")
-                    with m2: m_mail_city  = st.selectbox("Mailing City",    cols, _idx("mailing_city"),    key=f"mail_city_{idx}")
-                    with m3: m_mail_state = st.selectbox("Mailing State",   cols, _idx("mailing_state"),   key=f"mail_sta_{idx}")
-                    with m4: m_mail_zip   = st.selectbox("Mailing Zip",     cols, _idx("mailing_zip"),     key=f"mail_zip_{idx}")
-
-                    st.markdown("**📞 Phone Numbers**")
-                    p1,p2,p3,p4 = st.columns(4)
-                    with p1: m_ph1 = st.selectbox("Phone 1", cols, _idx("phone_1"), key=f"ph1_{idx}")
-                    with p2: m_ph2 = st.selectbox("Phone 2", cols, _idx("phone_2"), key=f"ph2_{idx}")
-                    with p3: m_ph3 = st.selectbox("Phone 3", cols, _idx("phone_3"), key=f"ph3_{idx}")
-                    with p4: m_ph4 = st.selectbox("Phone 4", cols, _idx("phone_4"), key=f"ph4_{idx}")
-
-                    with st.expander("📊 Optional Fields (Property Details, Financials, etc.)"):
-                        st.markdown("**Property Details**")
-                        o1,o2,o3,o4 = st.columns(4)
-                        with o1: m_apn       = st.selectbox("APN",           cols, _idx("apn"),           key=f"apn_{idx}")
-                        with o2: m_prop_type = st.selectbox("Property Type", cols, _idx("property_type"), key=f"prop_type_{idx}")
-                        with o3: m_prop_use  = st.selectbox("Property Use",  cols, _idx("property_use"),  key=f"prop_use_{idx}")
-                        with o4: m_land_use  = st.selectbox("Land Use",      cols, _idx("land_use"),      key=f"land_use_{idx}")
-                        o5,o6 = st.columns(2)
-                        with o5: m_subdiv    = st.selectbox("Subdivision",   cols, _idx("subdivision"),   key=f"subdiv_{idx}")
-                        with o6: m_legal     = st.selectbox("Legal Desc",    cols, _idx("legal_description"), key=f"legal_{idx}")
-
-                        st.markdown("**Size & Structure**")
-                        s1,s2,s3,s4 = st.columns(4)
-                        with s1: m_sqft    = st.selectbox("Living SqFt",  cols, _idx("living_sqft"), key=f"sqft_{idx}")
-                        with s2: m_acres   = st.selectbox("Lot Acres",    cols, _idx("lot_acres"),   key=f"acres_{idx}")
-                        with s3: m_lotsqft = st.selectbox("Lot SqFt",    cols, _idx("lot_sqft"),    key=f"lotsqft_{idx}")
-                        with s4: m_yr_blt  = st.selectbox("Year Built",   cols, _idx("year_built"),  key=f"yr_blt_{idx}")
-                        s5,s6,s7,s8 = st.columns(4)
-                        with s5: m_beds  = st.selectbox("Beds",    cols, _idx("beds"),        key=f"beds_{idx}")
-                        with s6: m_baths = st.selectbox("Baths",   cols, _idx("baths"),       key=f"baths_{idx}")
-                        with s7: m_story = st.selectbox("Stories", cols, _idx("stories"),     key=f"stories_{idx}")
-                        with s8: m_units = st.selectbox("Units",   cols, _idx("units_count"), key=f"units_{idx}")
-
-                        st.markdown("**Financial**")
-                        f1,f2,f3 = st.columns(3)
-                        with f1: m_occ   = st.selectbox("Occupancy",      cols, _idx("occupancy"),       key=f"occ_{idx}")
-                        with f2: m_val   = st.selectbox("Est Value",       cols, _idx("est_value"),       key=f"val_{idx}")
-                        with f3: m_sale  = st.selectbox("Last Sale Price", cols, _idx("last_sale_price"), key=f"sale_{idx}")
-
-                        st.markdown("**Owner Info**")
-                        oi1,oi2,oi3,oi4 = st.columns(4)
-                        with oi1: m_own_months  = st.selectbox("Ownership Months", cols, _idx("ownership_length_months"), key=f"own_mo_{idx}")
-                        with oi2: m_owner_type  = st.selectbox("Owner Type",       cols, _idx("owner_type"),              key=f"own_type_{idx}")
-                        with oi3: m_owner_occ   = st.selectbox("Owner Occupied",   cols, _idx("owner_occupied"),          key=f"own_occ_{idx}")
-                        with oi4: m_vacant_col  = st.selectbox("Vacant",           cols, _idx("vacant"),                  key=f"vacant_{idx}")
-
-                        # Garage / HVAC
-                        st.markdown("**Garage & HVAC**")
-                        g1,g2,g3,g4 = st.columns(4)
-                        with g1: m_garage_t = st.selectbox("Garage Type",  cols, _idx("garage_type"),  key=f"gar_t_{idx}")
-                        with g2: m_garage_s = st.selectbox("Garage SqFt",  cols, _idx("garage_sqft"),  key=f"gar_s_{idx}")
-                        with g3: m_ac       = st.selectbox("AC Type",      cols, _idx("ac_type"),      key=f"ac_{idx}")
-                        with g4: m_heat     = st.selectbox("Heating Type", cols, _idx("heating_type"), key=f"heat_{idx}")
-
-                    essential_ok = (m_prop_addr != "None" and m_prop_city != "None"
-                                    and m_prop_state != "None"
-                                    and (m_first != "None" or m_last != "None"))
-
-                    if not essential_ok:
-                        st.warning("Map at least: Property Address, City, State, and First or Last Name.")
-                    else:
-                        st.markdown("<div style='margin-top:0.75rem;'></div>", unsafe_allow_html=True)
-                        if st.button(f"⬆️ Import {uploaded_file.name}", key=f"import_{idx}", type="primary", use_container_width=True):
-                            prog   = st.progress(0)
-                            status = st.empty()
-                            stats  = {"new": 0, "error": 0, "skipped": 0}
-                            batch  = []
-                            BATCH_SIZE = 500
-
-                            for i, row in raw_df.iterrows():
-                                try:
-                                    addr_val = row.get(m_prop_addr) if m_prop_addr != "None" else None
-                                    if pd.isna(addr_val) or str(addr_val).strip() == "":
-                                        stats["skipped"] += 1; continue
-                                    city_val  = str(row.get(m_prop_city,"")).strip()[:100]  if m_prop_city  != "None" else ""
-                                    state_val = str(row.get(m_prop_state,"")).strip().upper()[:2] if m_prop_state != "None" else ""
-                                    if not city_val or not state_val:
-                                        stats["skipped"] += 1; continue
-
-                                    payload = {"address": str(addr_val).strip()[:255], "city": city_val, "state": state_val}
-                                    if source_name: payload["source"] = source_name
-
-                                    def _s(col, maxlen=255):
-                                        if col == "None" or pd.isna(row.get(col)): return None
-                                        return str(row[col]).strip()[:maxlen]
-                                    def _i(col):
-                                        if col == "None" or pd.isna(row.get(col)): return None
-                                        try: return int(float(str(row[col]).replace(",","")))
-                                        except: return None
-                                    def _f(col):
-                                        if col == "None" or pd.isna(row.get(col)): return None
-                                        try: return float(str(row[col]).replace(",","").replace("$",""))
-                                        except: return None
-                                    def _b(col, truthy=None):
-                                        if col == "None" or pd.isna(row.get(col)): return None
-                                        return str(row[col]).strip().lower() in (truthy or ["yes","y","true","1"])
-
-                                    if _s(m_prop_zip,  20):  payload["zip"]    = _s(m_prop_zip, 20)
-                                    if _s(m_prop_county,100): payload["county"] = _s(m_prop_county, 100)
-
-                                    of = _s(m_first, 100); ol = _s(m_last, 100)
-                                    if of: payload["owner_first"] = of
-                                    if ol: payload["owner_last"]  = ol
-
-                                    # Multi-owners
-                                    parts = []
-                                    if of or ol: parts.append(f"{of or ''} {ol or ''}".strip())
-                                    for ff, lf in [(m_o2f,m_o2l),(m_o3f,m_o3l),(m_o4f,m_o4l)]:
-                                        pf = _s(ff,100); pl = _s(lf,100)
-                                        if pf: parts.append(f"{pf} {pl or ''}".strip())
-                                    if len(parts) > 1:
-                                        payload["owner_name"] = " / ".join(parts)
-                                        payload.pop("owner_first",None); payload.pop("owner_last",None)
-
-                                    for key, col, mx in [("mailing_address",m_mail_addr,255),("mailing_city",m_mail_city,100),
-                                                          ("mailing_state",m_mail_state,2),("mailing_zip",m_mail_zip,20)]:
-                                        v = _s(col, mx)
-                                        if v: payload[key] = v
-
-                                    phones = [str(row[ph]).strip() for ph in [m_ph1,m_ph2,m_ph3,m_ph4]
-                                              if ph != "None" and not pd.isna(row.get(ph)) and str(row[ph]).strip()]
-                                    if phones: payload["phone_numbers"] = ", ".join(phones)
-
-                                    for key, col in [("apn",m_apn),("property_type",m_prop_type),("property_use",m_prop_use),
-                                                     ("land_use",m_land_use),("subdivision",m_subdiv),
-                                                     ("legal_description",m_legal),("garage_type",m_garage_t),
-                                                     ("ac_type",m_ac),("heating_type",m_heat),("owner_type",m_owner_type)]:
-                                        v = _s(col); v and payload.update({key: v})
-
-                                    for key, col in [("living_sqft",m_sqft),("lot_sqft",m_lotsqft),("year_built",m_yr_blt),
-                                                     ("stories",m_story),("units_count",m_units),
-                                                     ("garage_sqft",m_garage_s),("ownership_length_months",m_own_months)]:
-                                        v = _i(col)
-                                        if v is not None: payload[key] = v
-
-                                    for key, col in [("lot_acres",m_acres),("baths",m_baths),
-                                                     ("est_value",m_val),("last_sale_price",m_sale)]:
-                                        v = _f(col)
-                                        if v is not None: payload[key] = v
-
-                                    v = _i(m_beds)
-                                    if v is not None: payload["beds"] = v
-
-                                    v = _b(m_owner_occ, ["yes","y","true","1","owner occupied"])
-                                    if v is not None: payload["owner_occupied"] = v
-                                    v = _b(m_vacant_col, ["yes","y","true","1","vacant"])
-                                    if v is not None: payload["vacant"] = v
-
-                                    if m_occ != "None" and not pd.isna(row.get(m_occ)):
-                                        ov = str(row[m_occ]).strip()
-                                        payload["occupancy_status"] = (
-                                            "Vacant" if ov.lower() in ["vacant","v","empty"] else
-                                            "Occupied" if ov.lower() in ["occupied","occ","owner occupied"] else ov
-                                        )
-
-                                    batch.append(payload)
-                                    stats["new"] += 1
-                                    if len(batch) >= BATCH_SIZE:
-                                        bulk_insert_leads(batch); batch = []
-                                except Exception:
-                                    stats["error"] += 1
-
-                                prog.progress((i+1)/len(raw_df))
-                                status.text(f"Processing {i+1:,} / {len(raw_df):,}")
-
-                            if batch: bulk_insert_leads(batch)
-
-                            st.success(f"✅ Imported **{stats['new']:,}** leads · {stats['error']} errors · {stats['skipped']} skipped")
-                            if stats["new"] > 0:
-                                st.balloons()
-                                try:
-                                    list_name = source_name.strip() if (source_name and source_name.strip()) else uploaded_file.name
-                                    add_uploaded_list(list_name, uploaded_file.name)
-                                except Exception:
-                                    pass
+                    if st.button("📥 Import Phone Numbers", type="primary", key="ph_import_btn"):
+                        matched = 0; not_found = 0
+                        prog_ph = st.progress(0)
+                        for i, row in ph_df.iterrows():
+                            phones = [str(row[c]).strip() for c in [ph1_col,ph2_col,ph3_col,ph4_col]
+                                      if c != "None" and not pd.isna(row.get(c)) and str(row.get(c,"")).strip()
+                                      and str(row[c]).strip().lower() not in ("nan","none","null","")]
+                            if not phones:
+                                prog_ph.progress((i+1)/len(ph_df)); continue
+                            try:
+                                val = str(row.get(match_col, "")).strip()
+                                if not val: continue
+                                if match_by == "Address":
+                                    ex = execute_query("SELECT id, phone_numbers FROM properties WHERE LOWER(TRIM(street_address)) = LOWER(TRIM(%s)) LIMIT 1", (val,), fetch=True)
+                                else:
+                                    ex = execute_query("SELECT id, phone_numbers FROM properties WHERE LOWER(TRIM(apn)) = LOWER(TRIM(%s)) LIMIT 1", (val,), fetch=True)
+                                if ex:
+                                    lead = dict(ex[0])
+                                    if overwrite:
+                                        new_ph = ", ".join(phones)
+                                    else:
+                                        old_ph = [p.strip() for p in str(lead.get("phone_numbers") or "").split(",") if p.strip()]
+                                        new_ph = ", ".join(dict.fromkeys(old_ph + phones))
+                                    execute_query("UPDATE properties SET phone_numbers = %s WHERE id = %s", (new_ph, lead["id"]))
+                                    matched += 1
+                                else:
+                                    not_found += 1
+                            except Exception:
+                                not_found += 1
+                            prog_ph.progress((i+1)/len(ph_df))
+                        st.success(f"✅ Updated **{matched:,}** leads · {not_found:,} not matched")
                 except Exception as e:
-                    st.error(f"Error reading file: {e}")
+                    st.error(f"Error: {e}")
 
+        else:  # Manual
+            search_term = st.text_input("🔍 Search lead by address or name", placeholder="123 Main St", key="ph_search_term")
+            if search_term and len(search_term) >= 3:
+                try:
+                    results = execute_query(
+                        "SELECT id, street_address, city, state, owner_name, phone_numbers FROM properties WHERE street_address ILIKE %s OR owner_name ILIKE %s LIMIT 20",
+                        (f"%{search_term}%", f"%{search_term}%"), fetch=True
+                    )
+                    if results:
+                        choices = {f"{r['street_address']}, {r['city']} — {r.get('owner_name') or 'Unknown'}": dict(r) for r in results}
+                        picked = st.selectbox("Select lead", list(choices.keys()), key="ph_manual_pick")
+                        if picked:
+                            ld = choices[picked]
+                            st.info(f"Current phones: **{ld.get('phone_numbers') or 'None'}**")
+                            with st.form("manual_phone_form"):
+                                mp1,mp2 = st.columns(2); mp3,mp4 = st.columns(2)
+                                with mp1: new_ph1 = st.text_input("Phone 1", placeholder="555-123-4567")
+                                with mp2: new_ph2 = st.text_input("Phone 2")
+                                with mp3: new_ph3 = st.text_input("Phone 3")
+                                with mp4: new_ph4 = st.text_input("Phone 4")
+                                overwrite_m = st.checkbox("Replace existing (unchecked = append)", value=False)
+                                if st.form_submit_button("💾 Save", type="primary"):
+                                    new_phones = [p.strip() for p in [new_ph1,new_ph2,new_ph3,new_ph4] if p.strip()]
+                                    if new_phones:
+                                        if overwrite_m:
+                                            final = ", ".join(new_phones)
+                                        else:
+                                            old = [p.strip() for p in str(ld.get("phone_numbers") or "").split(",") if p.strip()]
+                                            final = ", ".join(dict.fromkeys(old + new_phones))
+                                        execute_query("UPDATE properties SET phone_numbers = %s WHERE id = %s", (final, ld["id"]))
+                                        st.success(f"✅ Saved: {final}")
+                                        st.rerun()
+                                    else:
+                                        st.warning("Enter at least one phone number.")
+                    else:
+                        st.info("No leads found.")
+                except Exception as e:
+                    st.error(str(e))
+
+    # ═══════════════════════════════════════════════════════════════
+    # TAB 3 — MANUAL SINGLE LEAD ENTRY
+    # ═══════════════════════════════════════════════════════════════
+    with import_tab3:
+        st.markdown('<div class="section-title">✏️ Add a Single Lead Manually</div>', unsafe_allow_html=True)
+        with st.form("manual_lead_form", clear_on_submit=True):
+            st.markdown("**📍 Property Location** *(required)*")
+            ml1,ml2,ml3,ml4 = st.columns(4)
+            with ml1: ml_addr  = st.text_input("Street Address *", placeholder="123 Main St")
+            with ml2: ml_city  = st.text_input("City *", placeholder="Columbus")
+            with ml3: ml_state = st.text_input("State *", placeholder="OH", max_chars=2)
+            with ml4: ml_zip   = st.text_input("Zip", placeholder="43215")
+
+            st.markdown("**👤 Owner**")
+            mo1,mo2 = st.columns(2)
+            with mo1: ml_first = st.text_input("First Name")
+            with mo2: ml_last  = st.text_input("Last Name")
+
+            st.markdown("**📞 Phone Numbers**")
+            mp1c,mp2c,mp3c = st.columns(3)
+            with mp1c: ml_ph1 = st.text_input("Phone 1", placeholder="555-123-4567")
+            with mp2c: ml_ph2 = st.text_input("Phone 2")
+            with mp3c: ml_ph3 = st.text_input("Phone 3")
+
+            st.markdown("**🏠 Property Details** *(optional)*")
+            pd1,pd2,pd3,pd4,pd5 = st.columns(5)
+            with pd1: ml_type  = st.selectbox("Type", ["","Single-Family","Condo","Multi-Family","Land","Commercial"])
+            with pd2: ml_beds  = st.number_input("Beds",  0, 20, 0)
+            with pd3: ml_baths = st.number_input("Baths", 0, 20, 0)
+            with pd4: ml_sqft  = st.number_input("SqFt",  0, 50000, 0, step=100)
+            with pd5: ml_yr    = st.number_input("Year Built", 1800, 2025, 0)
+
+            st.markdown("**💰 Financial** *(optional)*")
+            pf1,pf2,pf3 = st.columns(3)
+            with pf1: ml_value  = st.number_input("Est. Value ($)",  0, 10000000, 0, step=5000)
+            with pf2: ml_equity = st.number_input("Est. Equity ($)", 0, 10000000, 0, step=5000)
+            with pf3: ml_source = st.text_input("List Source", placeholder="e.g. Direct Mail March")
+
+            ml_notes = st.text_area("Notes", placeholder="Any notes about this lead...")
+            ml_stage = st.selectbox("Pipeline Stage", ["","New","Contacted","Negotiating","Closed","Lost"])
+
+            if st.form_submit_button("➕ Add Lead", type="primary", use_container_width=True):
+                if not ml_addr.strip() or not ml_city.strip() or not ml_state.strip():
+                    st.error("Address, City, and State are required.")
+                else:
+                    phones = [p.strip() for p in [ml_ph1,ml_ph2,ml_ph3] if p.strip()]
+                    payload = {"address": ml_addr.strip(), "city": ml_city.strip(), "state": ml_state.strip().upper()[:2]}
+                    if ml_zip.strip():    payload["zip"]           = ml_zip.strip()
+                    if ml_first.strip():  payload["owner_first"]   = ml_first.strip()
+                    if ml_last.strip():   payload["owner_last"]    = ml_last.strip()
+                    if phones:            payload["phone_numbers"] = ", ".join(phones)
+                    if ml_type:           payload["property_type"] = ml_type
+                    if ml_beds > 0:       payload["beds"]          = ml_beds
+                    if ml_baths > 0:      payload["baths"]         = ml_baths
+                    if ml_sqft > 0:       payload["living_sqft"]   = ml_sqft
+                    if ml_yr > 1800:      payload["year_built"]    = ml_yr
+                    if ml_value > 0:      payload["est_value"]     = ml_value
+                    if ml_equity > 0:     payload["est_equity_amt"]= ml_equity
+                    if ml_source.strip(): payload["source"]        = ml_source.strip()
+                    if ml_notes.strip():  payload["notes"]         = ml_notes.strip()
+                    if ml_stage:          payload["stage"]         = ml_stage
+                    try:
+                        stack_lead(payload)
+                        st.success(f"✅ Lead added: {ml_addr.strip()}, {ml_city.strip()}, {ml_state.strip().upper()}")
+                        st.balloons()
+                    except Exception as e:
+                        st.error(f"Error: {e}")
 
 # ═══════════════════════════════════════════════════════════════
 # PAGE: MY FILES
