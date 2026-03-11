@@ -10,7 +10,7 @@ _defaults = {
     "port": "5432",
     "dbname": "re_engine",
     "user": "postgres",
-    "password": "npg_nmNvPt0p1sUb",
+    "password": "",
     "sslmode": "prefer",
 }
 
@@ -626,3 +626,460 @@ def delete_properties(state_filter=None):
             return
         except Exception:
             continue
+
+
+# ================================================================
+# UPGRADE 1: LIST STACKING — find leads on multiple imported lists
+# ================================================================
+
+def get_stacked_leads(min_lists=2):
+    """
+    Returns leads that appear on more than min_lists imported lists.
+    These are 'High Priority' stacked leads.
+    """
+    try:
+        rows = execute_query("""
+            SELECT
+                p.id,
+                p.street_address,
+                p.city,
+                p.state,
+                p.owner_name,
+                p.phone_numbers,
+                p.est_value,
+                p.est_equity_pct,
+                p.motivation_score,
+                p.stage,
+                p.tags,
+                COUNT(DISTINCT p.last_list_source) AS list_count,
+                STRING_AGG(DISTINCT p.last_list_source, ' | ') AS list_names
+            FROM properties p
+            WHERE p.last_list_source IS NOT NULL AND TRIM(p.last_list_source) != ''
+            GROUP BY
+                p.id, p.street_address, p.city, p.state, p.owner_name,
+                p.phone_numbers, p.est_value, p.est_equity_pct,
+                p.motivation_score, p.stage, p.tags
+            HAVING COUNT(DISTINCT p.last_list_source) >= %s
+            ORDER BY list_count DESC, p.motivation_score DESC NULLS LAST
+        """, (min_lists,), fetch=True)
+        return rows or []
+    except Exception as e:
+        print(f"get_stacked_leads error: {e}")
+        return []
+
+
+def get_list_stack_summary():
+    """Returns count of stacked leads by overlap count."""
+    try:
+        rows = execute_query("""
+            SELECT list_count, COUNT(*) AS lead_count
+            FROM (
+                SELECT COUNT(DISTINCT last_list_source) AS list_count
+                FROM properties
+                WHERE last_list_source IS NOT NULL AND TRIM(last_list_source) != ''
+                GROUP BY LOWER(TRIM(street_address)), LOWER(TRIM(city))
+                HAVING COUNT(DISTINCT last_list_source) >= 2
+            ) sub
+            GROUP BY list_count
+            ORDER BY list_count DESC
+        """, fetch=True)
+        return rows or []
+    except Exception as e:
+        print(f"get_list_stack_summary error: {e}")
+        return []
+
+
+# ================================================================
+# UPGRADE 2: ADVANCED DISTRESS / MOTIVATION SCORING
+# ================================================================
+
+def calculate_distress_score(lead: dict) -> int:
+    """
+    Calculate a Distress Score (1-10) from lead attributes.
+    Higher = more motivated seller.
+
+    Triggers:
+      +2  Absentee owner (mailing != property address)
+      +2  High equity (est_equity_pct >= 40%)
+      +2  Tax delinquent (tax_delinquent_year is set)
+      +1  Vacant property
+      +1  Long ownership (ownership_length_months >= 120 = 10 years)
+      +1  Private/hard money loan
+      +1  Pre-foreclosure / NOD flag
+    """
+    score = 0
+
+    # Absentee: mailing state differs from property state
+    prop_state = (lead.get("state") or lead.get("property_state") or "").strip().upper()
+    mail_state = (lead.get("mailing_state") or "").strip().upper()
+    if mail_state and prop_state and mail_state != prop_state:
+        score += 2
+    elif lead.get("is_absentee"):
+        score += 2
+
+    # High equity
+    try:
+        equity_pct = float(lead.get("est_equity_pct") or 0)
+        if equity_pct >= 60:
+            score += 2
+        elif equity_pct >= 40:
+            score += 1
+    except (ValueError, TypeError):
+        pass
+
+    # Tax delinquent
+    if lead.get("tax_delinquent_year"):
+        score += 2
+
+    # Vacant
+    vacant = lead.get("vacant")
+    occ = str(lead.get("occupancy_status") or lead.get("occupancy") or "").lower()
+    if vacant is True or "vacant" in occ:
+        score += 1
+
+    # Long ownership
+    try:
+        months = int(lead.get("ownership_length_months") or 0)
+        if months >= 120:
+            score += 1
+    except (ValueError, TypeError):
+        pass
+
+    # Private loan / hard money
+    if lead.get("has_private_loan"):
+        score += 1
+
+    # Pre-foreclosure flag
+    preforeclosure_keywords = ["foreclosure", "nod", "lis pendens", "pre-foreclosure"]
+    tags_str = str(lead.get("tags") or "").lower()
+    prop_type = str(lead.get("property_type") or "").lower()
+    if any(k in tags_str or k in prop_type for k in preforeclosure_keywords):
+        score += 1
+
+    return min(max(score, 1), 10)
+
+
+def batch_update_distress_scores(state_filter=None):
+    """
+    Recalculates and saves distress scores for all (or filtered) leads.
+    Returns count of updated records.
+    """
+    try:
+        query = "SELECT * FROM properties"
+        params = []
+        if state_filter:
+            query += " WHERE state = %s OR property_state = %s"
+            params = [state_filter, state_filter]
+
+        rows = execute_query(query, params or None, fetch=True)
+        if not rows:
+            return 0
+
+        updated = 0
+        for lead in rows:
+            lead_dict = dict(lead)
+            score = calculate_distress_score(lead_dict)
+            execute_query(
+                "UPDATE properties SET motivation_score = %s WHERE id = %s",
+                (score, lead_dict["id"])
+            )
+            updated += 1
+        return updated
+    except Exception as e:
+        print(f"batch_update_distress_scores error: {e}")
+        return 0
+
+
+def get_score_distribution():
+    """Returns motivation score distribution for charts."""
+    try:
+        rows = execute_query("""
+            SELECT
+                motivation_score AS score,
+                COUNT(*) AS count
+            FROM properties
+            WHERE motivation_score IS NOT NULL
+            GROUP BY motivation_score
+            ORDER BY motivation_score DESC
+        """, fetch=True)
+        return rows or []
+    except Exception as e:
+        return []
+
+
+# ================================================================
+# UPGRADE 3: SKIP TRACING HOOK
+# ================================================================
+
+def skip_trace_lead(lead_id: int, provider: str = "batch_skip_tracing") -> dict:
+    """
+    Skip trace a single lead to get phone/email data.
+
+    Supported providers (set via Streamlit secrets):
+      - "batch_skip_tracing"  → batchskiptracing.com API
+      - "skip_genie"          → skipgenie.com API
+      - "prop_stream"         → propstream.com API
+
+    Returns dict with keys: success, phones, emails, error
+    Usage: Configure API key in .streamlit/secrets.toml:
+        [skip_trace]
+        provider = "batch_skip_tracing"
+        api_key  = "YOUR_KEY_HERE"
+    """
+    result = {"success": False, "phones": [], "emails": [], "lead_id": lead_id, "error": None}
+
+    try:
+        import streamlit as st
+        config = st.secrets.get("skip_trace", {})
+        api_key = config.get("api_key", "")
+        if not api_key:
+            result["error"] = "No skip trace API key configured in secrets.toml [skip_trace] api_key"
+            return result
+
+        # Fetch lead data
+        lead = execute_query("SELECT * FROM properties WHERE id = %s", (lead_id,), fetch=True)
+        if not lead:
+            result["error"] = f"Lead {lead_id} not found"
+            return result
+        lead = dict(lead[0])
+
+        # ── BatchSkipTracing ─────────────────────────────────────
+        if provider == "batch_skip_tracing":
+            import requests
+            payload = {
+                "firstName":  lead.get("owner_first", ""),
+                "lastName":   lead.get("owner_last", ""),
+                "address":    lead.get("street_address", ""),
+                "city":       lead.get("city", ""),
+                "state":      lead.get("state") or lead.get("property_state", ""),
+                "zip":        lead.get("zip_code", ""),
+                "mailingAddress": lead.get("mailing_address", ""),
+                "mailingCity":    lead.get("mailing_city", ""),
+                "mailingState":   lead.get("mailing_state", ""),
+                "mailingZip":     lead.get("mailing_zip", ""),
+            }
+            resp = requests.post(
+                "https://api.batchskiptracing.com/api/search",
+                json={"records": [payload]},
+                headers={"Content-Type": "application/json", "api-key": api_key},
+                timeout=15
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            phones = []
+            emails = []
+            if data.get("output"):
+                rec = data["output"][0] if data["output"] else {}
+                for key in ["phone1","phone2","phone3","phone4","phone5","phone6","phone7","phone8","phone9","phone10"]:
+                    ph = rec.get(key)
+                    if ph and str(ph).strip() not in ("", "None", "null"):
+                        phones.append(str(ph).strip())
+                for key in ["email1","email2","email3"]:
+                    em = rec.get(key)
+                    if em and str(em).strip() not in ("", "None", "null"):
+                        emails.append(str(em).strip())
+
+            if phones:
+                # Save back to DB
+                existing = lead.get("phone_numbers") or ""
+                all_phones = list(dict.fromkeys([p.strip() for p in existing.split(",") if p.strip()] + phones))
+                execute_query(
+                    "UPDATE properties SET phone_numbers = %s WHERE id = %s",
+                    (", ".join(all_phones), lead_id)
+                )
+            result.update({"success": True, "phones": phones, "emails": emails})
+
+        # ── SkipGenie ────────────────────────────────────────────
+        elif provider == "skip_genie":
+            import requests
+            resp = requests.post(
+                "https://api.skipgenie.com/v1/search",
+                json={
+                    "first_name": lead.get("owner_first", ""),
+                    "last_name":  lead.get("owner_last", ""),
+                    "address":    lead.get("street_address", ""),
+                    "city":       lead.get("city", ""),
+                    "state":      lead.get("state") or lead.get("property_state", ""),
+                    "zip":        lead.get("zip_code", ""),
+                },
+                headers={"Authorization": f"Bearer {api_key}"},
+                timeout=15
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            phones = [p.get("number") for p in data.get("phones", []) if p.get("number")]
+            emails = [e.get("address") for e in data.get("emails", []) if e.get("address")]
+            result.update({"success": True, "phones": phones, "emails": emails})
+
+        else:
+            result["error"] = f"Unknown provider: {provider}. Use 'batch_skip_tracing' or 'skip_genie'."
+
+    except ImportError:
+        result["error"] = "requests library not installed. Add 'requests' to requirements.txt"
+    except Exception as e:
+        result["error"] = str(e)
+
+    return result
+
+
+def bulk_skip_trace(lead_ids: list, provider: str = "batch_skip_tracing") -> dict:
+    """Skip trace multiple leads. Returns summary dict."""
+    results = {"success": 0, "failed": 0, "errors": []}
+    for lid in lead_ids:
+        r = skip_trace_lead(lid, provider)
+        if r["success"]:
+            results["success"] += 1
+        else:
+            results["failed"] += 1
+            if r["error"]:
+                results["errors"].append(f"Lead {lid}: {r['error']}")
+    return results
+
+
+# ================================================================
+# UPGRADE 4: MAP / GEO DATA
+# ================================================================
+
+def get_leads_with_coords(filters: dict = None) -> list:
+    """
+    Returns leads with lat/lon for map plotting.
+    Geocoding is done on-the-fly using nominatim (free, no API key).
+    For production, swap with Google Maps Geocoding API.
+    """
+    try:
+        query = """
+            SELECT
+                id, street_address, city,
+                state, property_state,
+                zip_code, owner_name, phone_numbers,
+                est_value, est_equity_pct, motivation_score,
+                stage, tags,
+                lat, lon
+            FROM properties
+            WHERE lat IS NOT NULL AND lon IS NOT NULL
+        """
+        params = []
+
+        if filters:
+            state = filters.get("state")
+            if state and state != "All States":
+                query += " AND (state = %s OR property_state = %s)"
+                params += [state, state]
+            min_score = filters.get("min_score")
+            if min_score:
+                query += " AND motivation_score >= %s"
+                params.append(min_score)
+            stage = filters.get("stage")
+            if stage and stage != "All":
+                query += " AND stage = %s"
+                params.append(stage)
+
+        query += " ORDER BY motivation_score DESC NULLS LAST LIMIT 2000"
+        rows = execute_query(query, params or None, fetch=True)
+        return [dict(r) for r in rows] if rows else []
+    except Exception as e:
+        print(f"get_leads_with_coords error: {e}")
+        return []
+
+
+def ensure_lat_lon_columns():
+    """Add lat/lon columns to properties table if missing."""
+    try:
+        execute_query("ALTER TABLE properties ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION")
+        execute_query("ALTER TABLE properties ADD COLUMN IF NOT EXISTS lon DOUBLE PRECISION")
+        return True
+    except Exception as e:
+        print(f"ensure_lat_lon_columns error: {e}")
+        return False
+
+
+def geocode_lead(lead_id: int) -> bool:
+    """
+    Geocode a single lead using Nominatim (OpenStreetMap, free).
+    For production volume use Google Maps API instead.
+    """
+    try:
+        import requests, time
+        lead = execute_query("SELECT * FROM properties WHERE id = %s", (lead_id,), fetch=True)
+        if not lead:
+            return False
+        lead = dict(lead[0])
+        address = f"{lead.get('street_address','')}, {lead.get('city','')}, {lead.get('state') or lead.get('property_state','')}, {lead.get('zip_code','')}"
+        resp = requests.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={"q": address, "format": "json", "limit": 1},
+            headers={"User-Agent": "REEnginePro/1.0"},
+            timeout=10
+        )
+        data = resp.json()
+        if data:
+            lat = float(data[0]["lat"])
+            lon = float(data[0]["lon"])
+            execute_query("UPDATE properties SET lat = %s, lon = %s WHERE id = %s", (lat, lon, lead_id))
+            time.sleep(1)  # Nominatim rate limit: 1 req/sec
+            return True
+    except Exception as e:
+        print(f"geocode_lead error: {e}")
+    return False
+
+
+def batch_geocode(limit: int = 100, state_filter: str = None) -> int:
+    """Geocode up to `limit` leads that have no lat/lon yet."""
+    try:
+        ensure_lat_lon_columns()
+        query = "SELECT id FROM properties WHERE (lat IS NULL OR lon IS NULL)"
+        params = []
+        if state_filter:
+            query += " AND (state = %s OR property_state = %s)"
+            params += [state_filter, state_filter]
+        query += f" LIMIT {int(limit)}"
+        leads = execute_query(query, params or None, fetch=True)
+        if not leads:
+            return 0
+        count = 0
+        for row in leads:
+            if geocode_lead(row["id"]):
+                count += 1
+        return count
+    except Exception as e:
+        print(f"batch_geocode error: {e}")
+        return 0
+
+
+# ================================================================
+# UPGRADE 5: VIEW-LEVEL KPI AGGREGATES
+# ================================================================
+
+def get_view_kpis(lead_ids: list) -> dict:
+    """
+    Given a list of property IDs (current search results),
+    returns KPI aggregates: total equity, avg motivation score, etc.
+    """
+    if not lead_ids:
+        return {"total_equity": 0, "avg_score": 0, "avg_value": 0, "vacant_count": 0, "absentee_count": 0}
+    try:
+        placeholders = ",".join(["%s"] * len(lead_ids))
+        rows = execute_query(f"""
+            SELECT
+                COALESCE(SUM(est_equity_amt), 0)          AS total_equity,
+                COALESCE(AVG(motivation_score), 0)        AS avg_score,
+                COALESCE(AVG(est_value), 0)               AS avg_value,
+                COUNT(*) FILTER (WHERE vacant = TRUE OR occupancy_status ILIKE '%vacant%') AS vacant_count,
+                COUNT(*) FILTER (WHERE is_absentee = TRUE OR
+                    (mailing_state IS NOT NULL AND mailing_state != state
+                     AND mailing_state != property_state)) AS absentee_count
+            FROM properties
+            WHERE id IN ({placeholders})
+        """, lead_ids, fetch=True)
+        if rows:
+            r = dict(rows[0])
+            return {
+                "total_equity":   float(r.get("total_equity") or 0),
+                "avg_score":      round(float(r.get("avg_score") or 0), 1),
+                "avg_value":      float(r.get("avg_value") or 0),
+                "vacant_count":   int(r.get("vacant_count") or 0),
+                "absentee_count": int(r.get("absentee_count") or 0),
+            }
+    except Exception as e:
+        print(f"get_view_kpis error: {e}")
+    return {"total_equity": 0, "avg_score": 0, "avg_value": 0, "vacant_count": 0, "absentee_count": 0}
