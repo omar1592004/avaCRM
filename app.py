@@ -29,6 +29,18 @@ from core import (
     count_properties,
     delete_properties,
     UPLOAD_STATUSES,
+    # ── Upgrades ──
+    get_stacked_leads,
+    get_list_stack_summary,
+    calculate_distress_score,
+    batch_update_distress_scores,
+    get_score_distribution,
+    skip_trace_lead,
+    bulk_skip_trace,
+    get_leads_with_coords,
+    ensure_lat_lon_columns,
+    batch_geocode,
+    get_view_kpis,
 )
 
 # ─────────────────────────────────────────────
@@ -462,6 +474,33 @@ if page_key == "Dashboard":
         st.error(str(e))
         st.exception(e)
 
+    # ── Distress Score Distribution + Stacking ── (outside try block)
+    st.markdown("<div style='margin-top:1.5rem;'></div>", unsafe_allow_html=True)
+    d1, d2 = st.columns([3, 1])
+    with d1:
+        st.markdown('<div class="section-title">🎯 Distress Score Distribution</div>', unsafe_allow_html=True)
+        try:
+            score_dist = get_score_distribution()
+            if score_dist:
+                df_sc = pd.DataFrame(score_dist).rename(columns={"score": "Score", "count": "Leads"})
+                df_sc["Score"] = df_sc["Score"].astype(str)
+                st.bar_chart(df_sc.set_index("Score")["Leads"], height=180)
+            else:
+                st.info("Go to Lead Engine → Distress Score → Recalculate All Scores to populate.")
+        except Exception:
+            st.info("No score data yet.")
+    with d2:
+        st.markdown('<div class="section-title">🔥 List Stacking</div>', unsafe_allow_html=True)
+        try:
+            stacked = get_stacked_leads(2)
+            st.markdown(f'''<div class="metric-tile">
+                <div class="label">Stacked Leads</div>
+                <div class="value" style="color:#f85149;">{len(stacked):,}</div>
+                <div class="delta">appear on 2+ lists</div>
+            </div>''', unsafe_allow_html=True)
+        except Exception:
+            pass
+
 
 # ═══════════════════════════════════════════════════════════════
 # PAGE: LEAD ENGINE
@@ -559,6 +598,18 @@ elif page_key == "Lead Engine":
         with st.expander("📊 Address Appearances"):
             min_appearances = st.number_input("Min appearances", min_value=1, value=2, step=1, key="min_appear")
             show_only_multi = st.checkbox("Only multi-appearance addresses", value=False, key="show_multi")
+
+        with st.expander("🎯 Distress Score"):
+            min_distress = st.slider("Min Distress Score", 1, 10, 1, key="min_distress")
+            filter_by_distress = st.checkbox("Filter by score", value=False, key="filter_distress")
+            st.caption("Score = Absentee+Equity+Tax Delinquent+Vacant+Ownership length")
+            if st.button("♻️ Recalculate All Scores", key="recalc_scores"):
+                with st.spinner("Scoring leads..."):
+                    try:
+                        n = batch_update_distress_scores()
+                        st.success(f"Updated {n:,} leads.")
+                    except Exception as e:
+                        st.error(str(e))
 
         st.markdown('</div>', unsafe_allow_html=True)
         run_search = st.button("🔍 Run Search", use_container_width=True, type="primary", key="run_search_btn")
@@ -691,7 +742,9 @@ elif page_key == "Lead Engine":
                 query += " AND last_sale_date <= %s"; params.append(last_sale_date)
             if private_loan:  query += " AND has_private_loan = TRUE"
             if cash_buyer:    query += " AND is_cash_buyer = TRUE"
-            query += " ORDER BY street_address" if not show_only_multi else " ORDER BY addr.appearance_count DESC, street_address"
+            if filter_by_distress and min_distress > 1:
+                query += " AND motivation_score >= %s"; params.append(min_distress)
+            query += " ORDER BY motivation_score DESC NULLS LAST, street_address" if not show_only_multi else " ORDER BY addr.appearance_count DESC, street_address"
             try:
                 conn = get_db_connection()
                 df   = pd.read_sql(query, conn, params=params)
@@ -712,10 +765,142 @@ elif page_key == "Lead Engine":
             sm = sp.get("show_only_multi", False)
             ma = sp.get("min_appearances", 2)
 
-            st.markdown(f'<div class="section-title">{"🏠 " + str(len(df)):,} Leads Found</div>', unsafe_allow_html=True)
+            # ── VIEW KPI CARDS ──
+            lead_ids = df["id"].tolist() if "id" in df.columns else []
+            if lead_ids:
+                try:
+                    kpis = get_view_kpis(lead_ids[:500])
+                    vk1, vk2, vk3, vk4, vk5 = st.columns(5)
+                    vk1.markdown(f'''<div class="metric-tile">
+                        <div class="label">Leads Found</div>
+                        <div class="value">{len(df):,}</div>
+                    </div>''', unsafe_allow_html=True)
+                    vk2.markdown(f'''<div class="metric-tile">
+                        <div class="label">Total Equity in View</div>
+                        <div class="value">${kpis["total_equity"]/1_000_000:.1f}M</div>
+                    </div>''', unsafe_allow_html=True)
+                    vk3.markdown(f'''<div class="metric-tile">
+                        <div class="label">Avg Motivation Score</div>
+                        <div class="value">{kpis["avg_score"]}/10</div>
+                    </div>''', unsafe_allow_html=True)
+                    vk4.markdown(f'''<div class="metric-tile">
+                        <div class="label">Vacant</div>
+                        <div class="value">{kpis["vacant_count"]:,}</div>
+                    </div>''', unsafe_allow_html=True)
+                    vk5.markdown(f'''<div class="metric-tile">
+                        <div class="label">Absentee</div>
+                        <div class="value">{kpis["absentee_count"]:,}</div>
+                    </div>''', unsafe_allow_html=True)
+                    st.markdown("<div style='margin-bottom:1rem;'></div>", unsafe_allow_html=True)
+                except Exception:
+                    pass
 
-            # Batch toolbar
-            b1, b2, b3, b4, b5, b6 = st.columns([1,1,1,1,1,2])
+            # ── MAP VIEW (split: map top, table bottom) ──
+            map_tab, table_tab, stack_tab = st.tabs(["🗺 Map View", "📋 Table View", "🔥 Stacked Leads"])
+
+            with map_tab:
+                try:
+                    import pydeck as pdk
+                    map_df = df.copy()
+                    # Use lat/lon if present, otherwise try to render what we have
+                    has_coords = "lat" in map_df.columns and "lon" in map_df.columns
+                    if has_coords:
+                        map_df = map_df[map_df["lat"].notna() & map_df["lon"].notna()]
+
+                    if has_coords and len(map_df) > 0:
+                        # Color by motivation score
+                        def score_color(score):
+                            if score is None or score == 0: return [100, 149, 237, 180]
+                            if score >= 8: return [248, 81, 73, 220]
+                            if score >= 6: return [251, 143, 68, 220]
+                            if score >= 4: return [227, 179, 65, 200]
+                            return [63, 185, 80, 180]
+                        map_df["color"] = map_df["motivation_score"].apply(score_color)
+                        map_df["tooltip_text"] = map_df.apply(
+                            lambda r: f"{r.get('street_address','')} | Score: {r.get('motivation_score','?')}", axis=1
+                        )
+
+                        layer = pdk.Layer(
+                            "ScatterplotLayer",
+                            data=map_df,
+                            get_position=["lon","lat"],
+                            get_color="color",
+                            get_radius=60,
+                            radius_min_pixels=5,
+                            radius_max_pixels=20,
+                            pickable=True,
+                            auto_highlight=True,
+                        )
+                        view = pdk.ViewState(
+                            latitude=map_df["lat"].mean(),
+                            longitude=map_df["lon"].mean(),
+                            zoom=10,
+                            pitch=0,
+                        )
+                        st.pydeck_chart(pdk.Deck(
+                            layers=[layer],
+                            initial_view_state=view,
+                            map_style="mapbox://styles/mapbox/dark-v10",
+                            tooltip={"text": "{tooltip_text}"},
+                        ))
+                        st.caption(f"🔴 High (8-10)  🟠 Med-High (6-7)  🟡 Med (4-5)  🟢 Low  · {len(map_df):,} pins")
+                    else:
+                        st.info("📍 No geocoded leads yet. Click **Geocode Results** to add map pins.")
+                        gc1, gc2 = st.columns([2,1])
+                        with gc1:
+                            st.caption("Geocoding uses OpenStreetMap (free). ~1 sec per lead.")
+                        with gc2:
+                            if st.button("🌐 Geocode Results", type="primary", key="geocode_btn"):
+                                with st.spinner("Geocoding..."):
+                                    try:
+                                        ensure_lat_lon_columns()
+                                        ids_to_geo = lead_ids[:50]
+                                        done = 0
+                                        for lid in ids_to_geo:
+                                            from core import geocode_lead
+                                            if geocode_lead(lid): done += 1
+                                        st.success(f"Geocoded {done} leads. Refresh search to see pins.")
+                                        st.rerun()
+                                    except Exception as ge:
+                                        st.error(str(ge))
+                except ImportError:
+                    st.warning("pydeck not installed. Add `pydeck` to requirements.txt")
+                except Exception as me:
+                    st.error(f"Map error: {me}")
+
+            with stack_tab:
+                st.markdown('<div class="section-title">🔥 List Stacking — High Priority Leads</div>', unsafe_allow_html=True)
+                st.caption("Leads appearing on 2+ of your imported lists are the hottest — motivated sellers on multiple radars.")
+                min_stack = st.slider("Minimum list appearances", 2, 10, 2, key="stack_slider")
+                try:
+                    stacked = get_stacked_leads(min_stack)
+                    summary = get_list_stack_summary()
+                    if summary:
+                        sc = st.columns(len(summary))
+                        for i, s in enumerate(summary):
+                            sc[i].markdown(f'''<div class="metric-tile">
+                                <div class="label">{s["list_count"]} Lists</div>
+                                <div class="value" style="color:#f85149;">{s["lead_count"]:,}</div>
+                                <div class="delta">stacked leads</div>
+                            </div>''', unsafe_allow_html=True)
+                        st.markdown("<div style='margin-top:1rem;'></div>", unsafe_allow_html=True)
+                    if stacked:
+                        stack_df = pd.DataFrame(stacked)
+                        st.dataframe(stack_df, use_container_width=True, hide_index=True)
+                        csv = stack_df.to_csv(index=False)
+                        st.download_button("📥 Export Stacked Leads", csv,
+                            f"stacked_leads_{datetime.datetime.now().strftime('%Y%m%d')}.csv", "text/csv")
+                    else:
+                        st.info("No stacked leads yet. Import multiple lists with the same addresses to see overlaps here.")
+                except Exception as se:
+                    st.error(f"Stacking error: {se}")
+
+            with table_tab:
+                st.markdown(f'<div class="section-title">🏠 {len(df):,} Leads Found</div>', unsafe_allow_html=True)
+
+            # Batch toolbar — shown below tabs
+            st.markdown("<div style='margin-top:0.5rem;'></div>", unsafe_allow_html=True)
+            b1, b2, b3, b4, b5, b6, b7 = st.columns([1,1,1,1,1,1,2])
             with b1:
                 if st.button("☑ All",    key="btn_sel_all"):   st.session_state["select_all_leads"] = True;  st.rerun()
             with b2:
@@ -727,6 +912,8 @@ elif page_key == "Lead Engine":
             with b5:
                 if st.button("📤 Export", key="batch_export"):  st.session_state["batch_action"] = "export"
             with b6:
+                if st.button("🔍 Skip Trace", key="batch_skip"): st.session_state["batch_action"] = "skip_trace"
+            with b7:
                 if st.button("🗑 Delete", key="batch_delete"):  st.session_state["batch_action"] = "delete"
 
             # Hide empty columns
@@ -851,6 +1038,50 @@ elif page_key == "Lead Engine":
                                 del st.session_state["search_results"]
                                 st.rerun()
                             if tc:
+                                del st.session_state["batch_action"]; st.rerun()
+
+                    elif act == "skip_trace":
+                        st.markdown('<div class="section-title">🔍 Skip Trace Selected Leads</div>', unsafe_allow_html=True)
+                        sel_ids = selected_rows["id"].tolist()
+                        st.info(f"Skip trace {len(sel_ids)} lead(s) to unlock phone numbers and emails.")
+                        st.caption("Configure your API key in `.streamlit/secrets.toml` under `[skip_trace]`.")
+
+                        provider_choice = st.selectbox(
+                            "Provider",
+                            ["batch_skip_tracing", "skip_genie"],
+                            format_func=lambda x: {
+                                "batch_skip_tracing": "BatchSkipTracing.com",
+                                "skip_genie": "SkipGenie.com",
+                            }[x],
+                            key="skip_provider"
+                        )
+                        sk1, sk2 = st.columns(2)
+                        with sk1:
+                            if st.button("🔍 Run Skip Trace", type="primary", key="skip_run"):
+                                results_sk = {"success": 0, "failed": 0, "errors": []}
+                                prog_sk = st.progress(0)
+                                for i, lid in enumerate(sel_ids):
+                                    r = skip_trace_lead(int(lid), provider_choice)
+                                    if r["success"]:
+                                        results_sk["success"] += 1
+                                    else:
+                                        results_sk["failed"] += 1
+                                        if r.get("error"):
+                                            results_sk["errors"].append(f"#{lid}: {r['error']}")
+                                    prog_sk.progress((i+1)/len(sel_ids))
+                                if results_sk["success"] > 0:
+                                    st.success(f"✅ Skip traced {results_sk['success']} leads successfully.")
+                                if results_sk["failed"] > 0:
+                                    st.warning(f"⚠️ {results_sk['failed']} failed.")
+                                if results_sk["errors"]:
+                                    with st.expander("Errors"):
+                                        for e in results_sk["errors"][:10]:
+                                            st.caption(e)
+                                del st.session_state["batch_action"]
+                                del st.session_state["search_results"]
+                                st.rerun()
+                        with sk2:
+                            if st.button("Cancel", key="skip_cancel"):
                                 del st.session_state["batch_action"]; st.rerun()
 
             # Notes
