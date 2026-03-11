@@ -277,21 +277,19 @@ with st.sidebar:
     st.caption("Real Estate CRM")
     st.divider()
 
-    if "current_page" not in st.session_state:
-        st.session_state["current_page"] = "Dashboard"
-
-    NAV = {
-        "Dashboard":   "📈  Dashboard",
-        "Lead Engine": "🔍  Lead Engine",
-        "Pipeline":    "📊  Pipeline",
-        "Import":      "📥  Import",
-        "My Files":    "📁  My Files",
-        "Tags":        "🏷  Tags",
-    }
-    for key, label in NAV.items():
-        if st.button(label, key=f"nav_{key}", use_container_width=True):
-            st.session_state["current_page"] = key
-            st.rerun()
+    page_key = st.radio(
+        "Navigation",
+        ["Dashboard", "Lead Engine", "Pipeline", "Import", "My Files", "Tags"],
+        format_func=lambda x: {
+            "Dashboard":   "📈  Dashboard",
+            "Lead Engine": "🔍  Lead Engine",
+            "Pipeline":    "📊  Pipeline",
+            "Import":      "📥  Import",
+            "My Files":    "📁  My Files",
+            "Tags":        "🏷  Tags",
+        }[x],
+        label_visibility="collapsed",
+    )
 
     st.divider()
     st.caption("MARKET FILTER")
@@ -312,8 +310,8 @@ with st.sidebar:
             st.rerun()
         if st.session_state.get("clear_confirm") is not None:
             confirm_state = st.session_state["clear_confirm"]
-            label = "all states" if confirm_state is None else confirm_state
-            st.warning(f"Delete {count_c:,} ({label})?")
+            label_text = "all states" if confirm_state is None else confirm_state
+            st.warning(f"Delete {count_c:,} ({label_text})?")
             c1, c2 = st.columns(2)
             with c1:
                 if st.button("Yes", key="clear_yes"):
@@ -336,7 +334,7 @@ if not _db_ok:
 # ─────────────────────────────────────────────
 # CURRENT PAGE
 # ─────────────────────────────────────────────
-page_key = st.session_state.get("current_page", "Dashboard")
+# page_key already set by sidebar radio above
 
 # ═══════════════════════════════════════════════════════════════
 # PAGE: DASHBOARD
