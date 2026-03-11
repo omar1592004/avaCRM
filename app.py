@@ -432,14 +432,36 @@ hr { border-color: var(--border) !important; }
     border-radius: 8px !important;
 }
 
+
+/* ── Hide nav button text (we use custom HTML labels) ── */
+[data-testid="stSidebar"] .stButton > button {
+    opacity: 0 !important;
+    height: 0 !important;
+    padding: 0 !important;
+    margin: -2px 0 0 0 !important;
+    border: none !important;
+    background: transparent !important;
+    position: absolute !important;
+    width: 100% !important;
+    cursor: pointer !important;
+    z-index: 10 !important;
+}
+[data-testid="stSidebar"] .stButton {
+    position: relative !important;
+    margin-top: -42px !important;
+    height: 38px !important;
+    z-index: 5 !important;
+}
+
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--bg-base); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-track { background: #0d1117; }
+::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #484f58; }
 
-/* Hide default streamlit chrome */
+/* Hide Streamlit chrome */
 #MainMenu, footer, header { visibility: hidden; }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -480,25 +502,37 @@ except Exception:
 # ─────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
-    <div style='padding: 1.2rem 1rem 1rem 1rem;'>
-        <div style='font-size:1.05rem;font-weight:700;color:#e6edf3;letter-spacing:0.02em;'>🏠 RE Engine Pro</div>
-        <div style='font-size:0.72rem;color:#484f58;margin-top:2px;'>Real Estate CRM</div>
+    <div style='padding:1.2rem 1rem 0.8rem 1rem;border-bottom:1px solid #30363d;margin-bottom:0.75rem;'>
+        <div style='font-size:1.1rem;font-weight:700;color:#e6edf3;'>🏠 RE Engine Pro</div>
+        <div style='font-size:0.72rem;color:#8b949e;margin-top:3px;'>Real Estate CRM</div>
     </div>
     """, unsafe_allow_html=True)
-    st.markdown("<hr style='margin:0 0 0.75rem 0;'>", unsafe_allow_html=True)
 
-    page = st.radio(
-        "Navigation",
-        ["📈  Dashboard", "🔍  Lead Engine", "📊  Pipeline", "📥  Import", "📁  My Files", "🏷  Tags"],
-        label_visibility="collapsed",
-    )
+    PAGES = ["📈 Dashboard", "🔍 Lead Engine", "📊 Pipeline", "📥 Import", "📁 My Files", "🏷 Tags"]
+    if "current_page" not in st.session_state:
+        st.session_state["current_page"] = "📈 Dashboard"
 
-    st.markdown("<hr style='margin:0.75rem 0;'>", unsafe_allow_html=True)
-    st.markdown("<div style='font-size:0.68rem;font-weight:600;letter-spacing:0.08em;color:#484f58;text-transform:uppercase;padding:0 1rem;margin-bottom:0.5rem;'>Market</div>", unsafe_allow_html=True)
+    for p in PAGES:
+        is_active = st.session_state["current_page"] == p
+        bg = "#21262d" if is_active else "transparent"
+        color = "#e6edf3" if is_active else "#8b949e"
+        border = "border-left:3px solid #2f81f7;" if is_active else "border-left:3px solid transparent;"
+        st.markdown(f"""
+        <div style='padding:0.55rem 1rem;border-radius:6px;margin-bottom:2px;
+                    background:{bg};{border}cursor:pointer;'>
+            <span style='color:{color};font-size:0.875rem;font-weight:{"600" if is_active else "400"};'>{p}</span>
+        </div>""", unsafe_allow_html=True)
+        if st.button(p, key=f"nav_{p}", use_container_width=True,
+                     help=p.split(" ", 1)[-1]):
+            st.session_state["current_page"] = p
+            st.rerun()
+
+    st.markdown("<div style='border-top:1px solid #30363d;margin:0.75rem 0;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size:0.68rem;font-weight:600;letter-spacing:0.08em;color:#484f58;text-transform:uppercase;padding:0 0.25rem;margin-bottom:0.4rem;'>Market Filter</div>", unsafe_allow_html=True)
     selected_state = st.selectbox("Market", ["All States"] + all_states, key="top_market", label_visibility="collapsed")
 
-    st.markdown("<hr style='margin:0.75rem 0;'>", unsafe_allow_html=True)
-    with st.expander("⚙️  Data Management", expanded=False):
+    st.markdown("<div style='border-top:1px solid #30363d;margin:0.75rem 0;'></div>", unsafe_allow_html=True)
+    with st.expander("⚙️ Data Management"):
         clear_scope = st.selectbox("Scope", ["All states"] + sorted(all_states), key="clear_scope")
         state_to_clear = None if clear_scope == "All states" else clear_scope
         count_c = 0
@@ -507,7 +541,7 @@ with st.sidebar:
         except Exception:
             pass
         st.caption(f"{count_c:,} properties in scope")
-        if st.button("Clear data", type="secondary", key="clear_data_btn"):
+        if st.button("🗑 Clear data", type="secondary", key="clear_data_btn"):
             st.session_state["clear_confirm"] = state_to_clear
             st.rerun()
         if st.session_state.get("clear_confirm") is not None:
@@ -534,9 +568,10 @@ if not _db_ok:
     st.stop()
 
 # ─────────────────────────────────────────────
-# STRIP EMOJI PREFIX FROM PAGE NAME
+# CURRENT PAGE
 # ─────────────────────────────────────────────
-page_key = page.split("  ")[-1].strip()  # e.g. "Dashboard"
+page = st.session_state.get("current_page", "📈 Dashboard")
+page_key = page.split(" ", 1)[-1].strip()  # e.g. "Dashboard"
 
 # ═══════════════════════════════════════════════════════════════
 # PAGE: DASHBOARD
