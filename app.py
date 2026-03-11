@@ -2,6 +2,11 @@ import streamlit as st
 import pandas as pd
 import datetime
 import json
+try:
+    import plotly.express as px
+    HAS_PLOTLY = True
+except ImportError:
+    HAS_PLOTLY = False
 from core import (
     execute_query,
     get_db_connection,
@@ -566,14 +571,35 @@ if page_key == "Dashboard":
             st.markdown('<div class="section-title">Leads by State</div>', unsafe_allow_html=True)
             if by_state:
                 df_s = pd.DataFrame(by_state).rename(columns={"state": "State", "cnt": "Leads"})
-                st.bar_chart(df_s.set_index("State")["Leads"], height=220)
+                if HAS_PLOTLY:
+                    fig = px.bar(df_s, x="State", y="Leads", height=220,
+                                 color="Leads", color_continuous_scale="Blues",
+                                 template="plotly_dark")
+                    fig.update_layout(margin=dict(l=0,r=0,t=0,b=0), showlegend=False,
+                                      coloraxis_showscale=False,
+                                      paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.dataframe(df_s, use_container_width=True, hide_index=True)
             else:
                 st.info("No state data yet — import a list to populate.")
         with ch2:
             st.markdown('<div class="section-title">Pipeline Distribution</div>', unsafe_allow_html=True)
             if by_stage:
                 df_p = pd.DataFrame(by_stage).rename(columns={"stage": "Stage", "cnt": "Leads"})
-                st.bar_chart(df_p.set_index("Stage")["Leads"], height=220)
+                STAGE_COLORS = {"New":"#58a6ff","Contacted":"#bc8cff","Negotiating":"#e3b341",
+                                 "Closed":"#3fb950","Lost":"#f85149","Unset":"#484f58"}
+                df_p["Color"] = df_p["Stage"].map(lambda s: STAGE_COLORS.get(s, "#8b949e"))
+                if HAS_PLOTLY:
+                    fig2 = px.bar(df_p, x="Stage", y="Leads", height=220,
+                                  color="Stage",
+                                  color_discrete_map=STAGE_COLORS,
+                                  template="plotly_dark")
+                    fig2.update_layout(margin=dict(l=0,r=0,t=0,b=0), showlegend=False,
+                                       paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                    st.plotly_chart(fig2, use_container_width=True)
+                else:
+                    st.dataframe(df_p[["Stage","Leads"]], use_container_width=True, hide_index=True)
             else:
                 st.info("No pipeline stages set yet.")
 
@@ -605,8 +631,19 @@ if page_key == "Dashboard":
             score_dist = get_score_distribution()
             if score_dist:
                 df_sc = pd.DataFrame(score_dist).rename(columns={"score": "Score", "count": "Leads"})
-                df_sc["Score"] = df_sc["Score"].astype(str)
-                st.bar_chart(df_sc.set_index("Score")["Leads"], height=180)
+                df_sc["Score"] = df_sc["Score"].astype(int)
+                df_sc = df_sc.sort_values("Score")
+                if HAS_PLOTLY:
+                    fig3 = px.bar(df_sc, x="Score", y="Leads", height=180,
+                                  color="Score",
+                                  color_continuous_scale=[[0,"#3fb950"],[0.5,"#e3b341"],[1,"#f85149"]],
+                                  template="plotly_dark")
+                    fig3.update_layout(margin=dict(l=0,r=0,t=0,b=0), showlegend=False,
+                                       coloraxis_showscale=False,
+                                       paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                    st.plotly_chart(fig3, use_container_width=True)
+                else:
+                    st.dataframe(df_sc, use_container_width=True, hide_index=True)
             else:
                 st.info("Go to Lead Engine → Distress Score → Recalculate All Scores to populate.")
         except Exception:
@@ -1891,3 +1928,4 @@ elif page_key == "Tags":
                         st.rerun()
         except Exception as e:
             st.error(str(e)); st.exception(e)
+            
