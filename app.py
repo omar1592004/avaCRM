@@ -162,24 +162,30 @@ html, body, [class*="css"], [class*="st-"] {
 [data-testid="stSidebarNav"],
 button[kind="header"] { display: none !important; }
 
-/* ── Top nav button row ── */
-div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] .stButton > button {
-    border-radius: 6px !important;
-    font-size: 0.82rem !important;
-    font-weight: 600 !important;
-    padding: 0.35rem 0.5rem !important;
-    width: 100% !important;
+/* ── Horizontal radio nav styling ── */
+div[data-testid="stRadio"] > div {
+    gap: 4px !important;
+    flex-wrap: nowrap !important;
 }
-div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] .stButton > button[kind="primary"] {
+div[data-testid="stRadio"] label {
+    border: 1px solid #30363d !important;
+    border-radius: 6px !important;
+    padding: 0.3rem 0.8rem !important;
+    font-size: 0.82rem !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    white-space: nowrap !important;
+    background: #161b22 !important;
+    color: #8b949e !important;
+    transition: all 0.15s !important;
+}
+div[data-testid="stRadio"] label:has(input:checked) {
     background: #2f81f7 !important;
     border-color: #2f81f7 !important;
     color: #fff !important;
+    font-weight: 600 !important;
 }
-div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] .stButton > button[kind="secondary"] {
-    background: #161b22 !important;
-    border-color: #30363d !important;
-    color: #8b949e !important;
-}
+div[data-testid="stRadio"] label input { display: none !important; }
 
 
 
@@ -327,45 +333,75 @@ except Exception:
 if "current_page" not in st.session_state:
     st.session_state["current_page"] = "Dashboard"
 
-PAGES = ["Dashboard", "Lead Engine", "Pipeline", "Import", "My Files", "Tags"]
-ICONS = {"Dashboard":"📈","Lead Engine":"🔍","Pipeline":"📊","Import":"📥","My Files":"📁","Tags":"🏷"}
-
-st.markdown("""
-<div style="display:flex;align-items:center;justify-content:space-between;
-     padding:0.6rem 1.5rem;background:#161b22;border-bottom:1px solid #30363d;
-     margin:-1rem -2rem 1.5rem -2rem;position:sticky;top:0;z-index:999;">
-  <div style="font-size:1rem;font-weight:700;color:#e6edf3;white-space:nowrap;">
-    🏠 RE Engine Pro
-  </div>
-</div>
-""", unsafe_allow_html=True)
-
-nav_cols = st.columns(len(PAGES))
-for i, pg in enumerate(PAGES):
-    active = st.session_state["current_page"] == pg
-    with nav_cols[i]:
-        label = f"{ICONS[pg]} {pg}"
-        if st.button(label, key=f"topnav_{pg}", use_container_width=True,
-                     type="primary" if active else "secondary"):
-            st.session_state["current_page"] = pg
-            st.rerun()
-
-st.markdown("<div style='border-bottom:1px solid #30363d;margin-bottom:1.25rem;'></div>",
-            unsafe_allow_html=True)
-
 page_key = st.session_state["current_page"]
 
-# Market filter — shown inline on relevant pages
+PAGES = [
+    ("Dashboard",   "📈 Dashboard"),
+    ("Lead Engine", "🔍 Lead Engine"),
+    ("Pipeline",    "📊 Pipeline"),
+    ("Import",      "📥 Import"),
+    ("My Files",    "📁 My Files"),
+    ("Tags",        "🏷 Tags"),
+]
+
+# Render nav as HTML links + hidden buttons
+nav_html = """
+<style>
+.topnav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 12px;
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    margin: -1rem -2rem 0 -2rem;
+}
+.topnav-brand {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #e6edf3;
+    margin-right: 16px;
+    white-space: nowrap;
+}
+</style>
+<div class="topnav">
+  <span class="topnav-brand">🏠 RE Engine Pro</span>
+</div>
+"""
+st.markdown(nav_html, unsafe_allow_html=True)
+
+# Actual clickable nav — use selectbox styled as nav for reliability
+nav_labels = [label for _, label in PAGES]
+nav_keys   = [key   for key, _ in PAGES]
+current_label = next(label for key, label in PAGES if key == page_key)
+
+chosen = st.radio(
+    "nav",
+    nav_labels,
+    index=nav_labels.index(current_label),
+    horizontal=True,
+    label_visibility="collapsed",
+    key="main_nav_radio",
+)
+if chosen != current_label:
+    new_key = next(key for key, label in PAGES if label == chosen)
+    st.session_state["current_page"] = new_key
+    st.rerun()
+
+st.markdown("<div style='border-bottom:1px solid #30363d;margin:0 0 1.25rem 0;'></div>",
+            unsafe_allow_html=True)
+
+# Market filter
 selected_state = "All States"
 if page_key in ("Lead Engine", "Pipeline", "Dashboard"):
     _sf_col, _ = st.columns([2, 5])
     with _sf_col:
         selected_state = st.selectbox(
             "🌎 Market", ["All States"] + all_states,
-            key="top_market", label_visibility="visible"
+            key="top_market"
         )
 
-# Data management in a small expander at bottom (only on Dashboard)
+# Data management expander (Dashboard only)
 if page_key == "Dashboard":
     with st.expander("⚙️ Data Management", expanded=False):
         clear_scope = st.selectbox("Scope", ["All states"] + sorted(all_states), key="clear_scope")
@@ -1800,3 +1836,4 @@ elif page_key == "Tags":
                         st.rerun()
         except Exception as e:
             st.error(str(e)); st.exception(e)
+            
