@@ -145,11 +145,18 @@ html, body, [class*="css"], [class*="st-"] {
 }
 
 /* ── Sidebar ── */
-[data-testid="stSidebar"] {
-    min-width: 230px !important;
-    max-width: 230px !important;
+[data-testid="stSidebar"],
+[data-testid="stSidebar"] > div,
+[data-testid="stSidebar"] > div > div {
+    min-width: 240px !important;
+    max-width: 240px !important;
+    width: 240px !important;
 }
-[data-testid="stSidebarHeader"] { display: none !important; }
+section[data-testid="stSidebar"] {
+    display: block !important;
+    visibility: visible !important;
+}
+[data-testid="stSidebarCollapseButton"] { display: none !important; }
 
 
 
@@ -236,6 +243,27 @@ html, body, [class*="css"], [class*="st-"] {
 #MainMenu, footer, header { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
+
+# Force sidebar always open via JS
+st.markdown('''
+<script>
+// Force sidebar expanded on load
+const forceOpenSidebar = () => {
+    const btn = window.parent.document.querySelector('[data-testid="stSidebarCollapseButton"]');
+    const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
+    if (sidebar) {
+        sidebar.style.display = "block";
+        sidebar.style.visibility = "visible";
+        sidebar.style.width = "240px";
+        sidebar.style.minWidth = "240px";
+    }
+};
+document.addEventListener("DOMContentLoaded", forceOpenSidebar);
+setTimeout(forceOpenSidebar, 100);
+setTimeout(forceOpenSidebar, 500);
+</script>
+''', unsafe_allow_html=True)
+
 
 # ─────────────────────────────────────────────
 # DB INIT
